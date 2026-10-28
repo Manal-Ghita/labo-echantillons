@@ -1,0 +1,60 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  RESEARCHER
+}
+
+model User {
+  id            String            @id @default(uuid()) @db.Uuid
+  name          String
+  email         String            @unique
+  passwordHash  String
+  role          Role
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  samples       Sample[]
+  recordedSteps FabricationStep[]
+}
+
+model Sample {
+  id          String            @id @default(uuid()) @db.Uuid
+  reference   String            @unique
+  name        String
+  description String?
+  creatorId   String            @db.Uuid
+  creator     User              @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
+  steps       FabricationStep[]
+
+  @@index([creatorId])
+}
+
+model FabricationStep {
+  id            String   @id @default(uuid()) @db.Uuid
+  sampleId      String   @db.Uuid
+  sample        Sample   @relation(fields: [sampleId], references: [id], onDelete: Restrict)
+  operationName String
+  performedAt   DateTime @db.Timestamptz(3)
+  parameters    String?
+  observations  String?
+  recordedById  String   @db.Uuid
+  recordedBy    User     @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([sampleId, performedAt])
+  @@index([recordedById])
+}

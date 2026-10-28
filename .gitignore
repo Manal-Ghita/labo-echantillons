@@ -1,4 +1,35 @@
 node_modules/
 .env
+.env.*
+!.env.example
 dist/
 coverage/
+*.tsbuildinfo
+backend/src/generated/prisma/
+backend/generated/prisma/
+# Local tools and generated agent skills
+.agents/
+.claude/
+.cursor/
+.devin/
+.windsurf/
+skills-lock.json
+
+# Local caches, logs and editor files
+build/
+.nyc_output/
+logs/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.temp/
+.tmp/
+pids/
+*.pid
+*.pid.lock
+report.*.json
