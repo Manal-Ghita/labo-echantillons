@@ -19,6 +19,13 @@ Aucun compte initial n'est créé par les tests.
 
 - `POST /auth/login` : JSON `{ "email": "…", "password": "…" }`, retourne `access_token`, `token_type` et `expires_in`.
 - `GET /auth/me` : en-tête `Authorization: Bearer <token>`, retourne uniquement id, nom, email, rôle et date de création.
+- `GET /users` : liste des comptes, ADMIN uniquement, mêmes champs publics.
+- `POST /users` : ADMIN uniquement, corps `name`, `email`, `password`.
+  Le rôle créé est toujours RESEARCHER ; un champ `role` envoyé par le client est refusé.
+  Mot de passe : au moins 12 caractères et au plus 72 octets UTF-8, bcrypt coût 12.
+  L'email est unique et conserve la casse comme les comptes existants ; un conflit renvoie 409.
+  Aucun mot de passe ou hash n'est renvoyé. Pas d'inscription publique, suppression,
+  promotion ADMIN ou réinitialisation de mot de passe dans ce parcours.
 - `POST /samples` : même en-tête ; rôles ADMIN ou RESEARCHER ; corps limité à reference, name et description.
 - Les GET `/samples` et `/samples/:id` exigent le même en-tête JWT, pour tous les utilisateurs authentifiés.
 - Les GET `/step-types` et `/step-types/:id` exigent un JWT. Seul ADMIN peut inclure ou consulter les types inactifs.

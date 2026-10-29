@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
+import { UsersPage } from './users/UsersPage'
 import {
   CatalogueDetailPage,
   CataloguePage,
@@ -26,6 +27,7 @@ export function App() {
           <Route path="/step-types" element={<CataloguePage />} />
           <Route element={<RequireAuth roles={['ADMIN']} />}>
             <Route path="/step-types/new" element={<CreateCataloguePage />} />
+            <Route path="/users" element={<UsersPage />} />
           </Route>
           <Route path="/step-types/:id" element={<CatalogueDetailPage />} />
           <Route

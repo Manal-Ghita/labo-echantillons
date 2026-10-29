@@ -4,6 +4,7 @@ import { SamplesModule } from './samples/samples.module';
 import { HealthModule } from './health/health.module';
 import { StepTypesModule } from './step-types/step-types.module';
 import { FabricationStepsModule } from './fabrication-steps/fabrication-steps.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { FabricationStepsModule } from './fabrication-steps/fabrication-steps.mo
     HealthModule,
     StepTypesModule,
     FabricationStepsModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

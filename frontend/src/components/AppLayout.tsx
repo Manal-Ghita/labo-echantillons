@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../auth/context'
 
 export function AppLayout() {
-  const { user, logout } = useAuth()
+  const { user, logout, hasRole } = useAuth()
   const location = useLocation()
   useEffect(() => {
     document.getElementById('main-content')?.focus({ preventScroll: true })
@@ -27,6 +27,7 @@ export function AppLayout() {
         <nav aria-label="Navigation principale">
           <NavLink to="/samples">Échantillons</NavLink>
           <NavLink to="/step-types">Catalogue</NavLink>
+          {hasRole('ADMIN') && <NavLink to="/users">Comptes</NavLink>}
         </nav>
         <div className="account">
           <div>
