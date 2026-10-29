@@ -495,3 +495,129 @@ h2 {
     scroll-behavior: auto !important;
   }
 }
+
+textarea {
+  font: inherit;
+  color: inherit;
+}
+.button {
+  text-decoration: none;
+}
+.sample-search,
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.field label {
+  font-weight: 650;
+  font-size: 0.88rem;
+}
+.field input,
+.field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #c8d4cf;
+  border-radius: 5px;
+  padding: 0.75rem;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.field textarea {
+  resize: vertical;
+}
+.field p {
+  font-size: 0.8rem;
+  margin: 0;
+}
+.sample-search .field {
+  flex: 1 1 250px;
+}
+.sample-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 1rem;
+}
+.sample-card,
+.sample-panel {
+  background: #fff;
+  border: 1px solid #dce5de;
+  border-radius: 10px;
+  padding: clamp(1rem, 3vw, 2rem);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sample-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+.sample-card p {
+  margin: 0;
+}
+.sample-card h2 {
+  font-size: 1.3rem;
+  margin: 0.5rem 0;
+}
+.sample-card .muted {
+  font-size: 0.8rem;
+  margin-top: auto;
+}
+.sample-reference {
+  font-family: ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.sample-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.back-link {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+}
+.sample-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 1.5rem;
+  margin-bottom: 0;
+}
+.sample-facts dt {
+  font-size: 0.8rem;
+  color: #607174;
+}
+.sample-facts dd {
+  margin: 0.3rem 0 0;
+}
+.sample-form {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.sample-form .form-actions {
+  margin: 0;
+}
+.sample-form .alert p {
+  margin: 0;
+}
+.page-heading h1 {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 500px) {
+  .sample-search > .button,
+  .form-actions > .button {
+    width: 100%;
+  }
+}

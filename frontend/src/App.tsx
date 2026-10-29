@@ -3,6 +3,11 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import {
+  CreateSamplePage,
+  SampleDetailPage,
+  SamplesPage,
+} from './samples/SamplesPages'
 
 export function App() {
   return (
@@ -11,7 +16,9 @@ export function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<Navigate to="/samples" replace />} />
-          <Route path="/samples" element={<PlaceholderPage kind="samples" />} />
+          <Route path="/samples" element={<SamplesPage />} />
+          <Route path="/samples/new" element={<CreateSamplePage />} />
+          <Route path="/samples/:id" element={<SampleDetailPage />} />
           <Route
             path="/step-types"
             element={<PlaceholderPage kind="catalog" />}

@@ -37,7 +37,11 @@ function validApi(role = 'RESEARCHER') {
   fetcher.mockImplementation((url: string) =>
     Promise.resolve(
       Response.json(
-        url.endsWith('/auth/login') ? loginResponse : { ...profile, role },
+        url.endsWith('/auth/login')
+          ? loginResponse
+          : url.includes('/samples')
+            ? []
+            : { ...profile, role },
       ),
     ),
   )

@@ -1,7 +1,7 @@
 # Frontend — Les échantillons du labo
 
 React, TypeScript strict, Vite et React Router en mode déclaratif.
-Interface de connexion et pages privées provisoires, sans bibliothèque UI.
+Connexion et gestion des échantillons, sans bibliothèque UI.
 
 ## Démarrage
 
@@ -31,7 +31,14 @@ Adapter cette valeur puis redémarrer NestJS si l'origine frontend change.
 ## Routes et session
 
 - `/login` : email/mot de passe envoyés en JSON à `POST /auth/login`.
-- `/samples` et `/step-types` : pages privées provisoires, sans chargement métier.
+- `/samples` : liste via `GET /samples`, recherche par référence ou nom avec `q`.
+- `/samples/new` : création via `POST /samples`, puis ouverture du détail.
+  Seuls `reference`, `name` et la description facultative sont envoyés ;
+  le backend détermine le propriétaire à partir du JWT.
+- `/samples/:id` : détail via `GET /samples/:id` (UUID technique).
+  Le propriétaire est affiché par son identifiant : l'API ne fournit pas son nom.
+  Un statut nul est affiché « Non renseigné », sans lui attribuer un état métier.
+- `/step-types` : page privée provisoire du catalogue.
 - Le profil est récupéré par `GET /auth/me` avec `Authorization: Bearer <token>`.
   Ses champs sont `id`, `name`, `email`, `role` et `createdAt`. Aucun rôle n'est
   déduit d'un JWT décodé ou d'un profil enregistré dans le navigateur.
@@ -58,8 +65,10 @@ npm run test:browser
 ```
 
 Vitest/React Testing Library vérifient les contrats de connexion/profil, le client HTTP,
-les refus 401/403, la protection des routes, les rôles, l'expiration et la déconnexion.
-Les tests Playwright exercent navigation, rechargement, erreur de connexion et
+les refus 401/403, la protection des routes, les rôles, l'expiration et la déconnexion,
+ainsi que liste, recherche, détail, création et erreurs 400/404/409/réseau.
+Les tests Playwright exercent aussi le parcours liste → recherche → détail → création,
+navigation, rechargement, erreur de connexion et
 absence de débordement horizontal à 1440×1000 et 375×812.
 L'API est simulée dans ces tests : aucun compte ni donnée PostgreSQL n'est créé.
 
