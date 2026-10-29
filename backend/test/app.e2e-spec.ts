@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
@@ -7,11 +8,14 @@ import { PrismaService } from '../src/prisma/prisma.service';
 
 describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
   let app: INestApplication;
+  let token: string;
+  const userId = '3fd8de68-8847-42fc-94df-99459f699ba9';
   const oldSecret = process.env.JWT_SECRET;
   const prisma = {
     $queryRaw: jest.fn(),
     user: { findUnique: jest.fn() },
     sample: { findMany: jest.fn(), create: jest.fn() },
+    stepType: { findMany: jest.fn() },
   };
 
   beforeAll(async () => {
@@ -25,12 +29,18 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
+    token = await moduleFixture.get(JwtService).signAsync({ sub: userId });
   });
 
   beforeEach(() => {
     jest.resetAllMocks();
     prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
     prisma.sample.findMany.mockResolvedValue([]);
+    prisma.user.findUnique.mockResolvedValue({
+      id: userId,
+      role: 'RESEARCHER',
+    });
+    prisma.stepType.findMany.mockResolvedValue([]);
   });
 
   it('GET /health confirme la disponibilité de PostgreSQL', async () => {
@@ -46,9 +56,21 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
       .expect(503, { status: 'error', database: 'down' });
   });
 
-  it('préserve la recherche publique', async () => {
-    await request(app.getHttpServer()).get('/samples?q=film').expect(200, []);
+  it('préserve la recherche authentifiée', async () => {
+    await request(app.getHttpServer())
+      .get('/samples?q=film')
+      .auth(token, { type: 'bearer' })
+      .expect(200, []);
     expect(prisma.sample.findMany).toHaveBeenCalled();
+  });
+
+  it('intègre le catalogue authentifié et refuse les consultations anonymes', async () => {
+    await request(app.getHttpServer())
+      .get('/step-types')
+      .auth(token, { type: 'bearer' })
+      .expect(200, []);
+    await request(app.getHttpServer()).get('/step-types').expect(401);
+    await request(app.getHttpServer()).get('/samples').expect(401);
   });
 
   it('interdit une création sans JWT', async () => {

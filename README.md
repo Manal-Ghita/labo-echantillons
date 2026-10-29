@@ -27,8 +27,25 @@ Le Compose actuel démarre uniquement PostgreSQL ; la conteneurisation de l'API 
 - `GET /health` : santé de l'API et de PostgreSQL, HTTP 200 ou 503.
 - `POST /auth/login` : connexion par email et mot de passe.
 - `GET /auth/me` : identité, JWT requis.
-- `GET /samples`, `GET /samples?q=film`, `GET /samples/:id` : consultation publique.
+- `GET /samples`, `GET /samples?q=film`, `GET /samples/:id` : consultation authentifiée.
 - `POST /samples` : création, JWT requis, rôle ADMIN ou RESEARCHER.
+- `GET /step-types`, `GET /step-types/:id` : types actifs et définitions, JWT requis.
+- `GET /step-types?includeInactive=true` : inclut les types inactifs, ADMIN uniquement.
+- `POST /step-types`, `PATCH /step-types/:id` : administration du catalogue, ADMIN uniquement.
+
+Les types sont créés avec `code`, `name`, `description` facultative et un tableau
+`parameters` (éventuellement vide). Chaque paramètre possède une `key` unique dans
+le type, un `name`, un `dataType` NUMBER/TEXT/BOOLEAN, une `unit` facultative et
+un booléen `isRequired`. Les clés commencent par une lettre et utilisent lettres,
+chiffres et underscores ; les espaces extérieurs sont retirés.
+Codes et clés restent sensibles à la casse.
+
+Le PATCH accepte uniquement `name`, `description` (ou null pour l'effacer) et
+`isActive`. Le code et les définitions, y compris le libellé d'un paramètre,
+sont immuables dès la création afin de protéger leur signification historique.
+Pour une évolution incompatible, créer un nouveau type et désactiver l'ancien.
+Il n'existe aucune route de suppression physique. Un chercheur reçoit 404 pour
+la consultation individuelle d'un type inactif ; ADMIN peut encore le consulter.
 
 Il n'existe aucune inscription publique. Pour le premier administrateur, définir les variables locales `ADMIN_*` et utiliser `npm run admin:create` après autorisation. Détails dans [backend/AUTH.md](backend/AUTH.md).
 
@@ -47,6 +64,10 @@ npm run lint
 
 Les tests ordinaires et e2e utilisent Prisma simulé et n'écrivent pas dans PostgreSQL.
 Le test d'intégration réel est séparé : `npm run test:postgres`, uniquement après accord, avec une base dédiée vide déjà migrée et `TEST_DATABASE_URL`. Voir [backend/AUTH.md](backend/AUTH.md).
+L'intégration du catalogue se lance séparément avec `npm run test:step-types:postgres`,
+après autorisation, exclusivement sur `labo_echantillons_test` déjà migrée.
+Ses comptes et données fictifs sont annulés par transaction ; détails dans
+[backend/test/STEP-TYPES-TEST.md](backend/test/STEP-TYPES-TEST.md).
 
 À la racine, `git diff --check` vérifie les espaces des modifications suivies.
 Les schémas et migrations Prisma sont versionnés ; le client généré, `node_modules`, `dist` et les secrets restent ignorés.

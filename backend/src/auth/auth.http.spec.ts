@@ -284,8 +284,19 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
       .auth(token, { type: 'bearer' })
       .expect(200);
   });
-  it('préserve les lectures publiques', async () => {
-    await request(app.getHttpServer()).get('/samples?q=film').expect(200, []);
-    expect(prisma.user.findUnique).not.toHaveBeenCalled();
+  it('permet les lectures aux utilisateurs authentifiés', async () => {
+    await request(app.getHttpServer())
+      .get('/samples?q=film')
+      .auth(token, { type: 'bearer' })
+      .expect(200, []);
+    expect(prisma.user.findUnique).toHaveBeenCalled();
+  });
+  it('refuse les lectures d’échantillons sans JWT', async () => {
+    await request(app.getHttpServer()).get('/samples').expect(401);
+    await request(app.getHttpServer())
+      .get('/samples/' + id)
+      .expect(401);
+    expect(prisma.sample.findMany).not.toHaveBeenCalled();
+    expect(prisma.sample.findUnique).not.toHaveBeenCalled();
   });
 });

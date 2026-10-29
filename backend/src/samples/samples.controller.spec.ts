@@ -8,19 +8,21 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 describe('SamplesController HTTP (service simulé)', () => {
   let app: INestApplication;
   const service = { findAll: jest.fn(), findOne: jest.fn(), create: jest.fn() };
+  const guard = { canActivate: jest.fn() };
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [SamplesController],
       providers: [{ provide: SamplesService, useValue: service }],
     })
       .overrideGuard(JwtAuthGuard)
-      .useValue({ canActivate: () => false })
+      .useValue(guard)
       .compile();
     app = module.createNestApplication();
     await app.init();
   });
   beforeEach(() => {
     jest.resetAllMocks();
+    guard.canActivate.mockReturnValue(true);
   });
   afterAll(async () => {
     await app.close();
@@ -53,6 +55,7 @@ describe('SamplesController HTTP (service simulé)', () => {
     expect(service.findOne).toHaveBeenCalledWith(id);
   });
   it('ne permet aucune création HTTP sans authentification', async () => {
+    guard.canActivate.mockReturnValue(false);
     await request(app.getHttpServer())
       .post('/samples')
       .send({ reference: 'X', name: 'Film', createdById: 'intrus' })

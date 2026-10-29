@@ -20,7 +20,9 @@ Aucun compte initial n'est créé par les tests.
 - `POST /auth/login` : JSON `{ "email": "…", "password": "…" }`, retourne `access_token`, `token_type` et `expires_in`.
 - `GET /auth/me` : en-tête `Authorization: Bearer <token>`, retourne uniquement id, nom, email, rôle et date de création.
 - `POST /samples` : même en-tête ; rôles ADMIN ou RESEARCHER ; corps limité à reference, name et description.
-- Les GET `/samples` et `/samples/:id` restent publics.
+- Les GET `/samples` et `/samples/:id` exigent le même en-tête JWT, pour tous les utilisateurs authentifiés.
+- Les GET `/step-types` et `/step-types/:id` exigent un JWT. Seul ADMIN peut inclure ou consulter les types inactifs.
+- POST et PATCH `/step-types` sont réservés à ADMIN ; code et définitions restent immuables.
 
 Les mots de passe, leurs empreintes et la clé JWT ne sont jamais retournés par ces routes.
 Les réponses de connexion ne distinguent pas email inconnu et mot de passe incorrect.

@@ -19,6 +19,7 @@ import { ListSamplesDto } from './dto/list-samples.dto';
 import { SamplesService } from './samples.service';
 
 @Controller('samples')
+@UseGuards(JwtAuthGuard)
 @UsePipes(
   new ValidationPipe({
     transform: true,
@@ -40,7 +41,7 @@ export class SamplesController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles('ADMIN', 'RESEARCHER')
   create(@Body() dto: CreateSampleDto, @Req() request: AuthenticatedRequest) {
     return this.samples.create(dto, request.user.id);
