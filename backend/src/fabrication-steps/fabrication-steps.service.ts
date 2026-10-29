@@ -11,6 +11,7 @@ import type { ParameterDefinition } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { decimalValue } from './decimal-value';
 import { CreateFabricationStepDto } from './dto/create-fabrication-step.dto';
+import { CorrectFabricationStepDto } from './dto/correct-fabrication-step.dto';
 
 const historyInclude = {
   parameterValues: {
@@ -19,7 +20,15 @@ const historyInclude = {
   },
   recordedBy: { select: { id: true, name: true } },
   operator: { select: { id: true, name: true } },
-  stepType: { select: { id: true, code: true, name: true, isActive: true } },
+  stepType: {
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      isActive: true,
+      parameters: true,
+    },
+  },
 } satisfies Prisma.FabricationStepInclude;
 type StepWithDetails = Prisma.FabricationStepGetPayload<{
   include: typeof historyInclude;
@@ -57,6 +66,155 @@ function parameterData(definition: ParameterDefinition, value: unknown) {
 @Injectable()
 export class FabricationStepsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async correct(
+    sampleId: string,
+    stepId: string,
+    dto: CorrectFabricationStepDto,
+    actor: Pick<AuthenticatedUser, 'id' | 'role'>,
+  ) {
+    if (
+      ![
+        'performedAt',
+        'result',
+        'operatorId',
+        'observations',
+        'parameters',
+        'parameterValues',
+      ].some((key) => dto[key as keyof CorrectFabricationStepDto] !== undefined)
+    )
+      throw new BadRequestException('Au moins un champ à corriger est requis.');
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const previous = await tx.fabricationStep.findUnique({
+            where: { id: stepId },
+            include: {
+              ...historyInclude,
+              sample: { select: { creatorId: true } },
+            },
+          });
+          if (!previous || previous.sampleId !== sampleId)
+            throw new NotFoundException(
+              'Étape introuvable pour cet échantillon.',
+            );
+          if (actor.role !== 'ADMIN' && previous.sample.creatorId !== actor.id)
+            throw new ForbiddenException(
+              'Correction réservée au propriétaire ou à ADMIN.',
+            );
+          if (previous.revision !== dto.expectedRevision)
+            throw new ConflictException(
+              'Cette étape a déjà été corrigée ; rechargez son historique.',
+            );
+          if (dto.operatorId) {
+            if (
+              !(await tx.user.findUnique({
+                where: { id: dto.operatorId },
+                select: { id: true },
+              }))
+            )
+              throw new BadRequestException('Opérateur inconnu.');
+          }
+          let values: ReturnType<typeof parameterData>[] | undefined;
+          if (dto.parameterValues !== undefined) {
+            const definitions = new Map(
+              previous.stepType?.parameters.map((definition) => [
+                definition.id,
+                definition,
+              ]) ?? [],
+            );
+            const seen = new Set<string>();
+            values = dto.parameterValues.map((parameter) => {
+              const id = parameter.definitionId.toLowerCase();
+              if (seen.has(id))
+                throw new BadRequestException(
+                  'Un paramètre ne peut être fourni qu’une fois.',
+                );
+              seen.add(id);
+              const definition = definitions.get(id);
+              if (!definition)
+                throw new BadRequestException(
+                  'Paramètre inconnu pour cette opération.',
+                );
+              return parameterData(definition, parameter.value);
+            });
+            if (
+              [...definitions.values()].some(
+                (definition) =>
+                  definition.isRequired && !seen.has(definition.id),
+              )
+            )
+              throw new BadRequestException(
+                'Un paramètre obligatoire est absent.',
+              );
+          }
+          const beforeSnapshot = JSON.parse(
+            JSON.stringify(serializeStep(previous)),
+          ) as Prisma.InputJsonValue;
+          const updated = await tx.fabricationStep.update({
+            where: { id: stepId },
+            data: {
+              ...(dto.performedAt !== undefined
+                ? { performedAt: new Date(dto.performedAt) }
+                : {}),
+              ...(dto.result !== undefined ? { result: dto.result } : {}),
+              ...(dto.operatorId !== undefined
+                ? { operatorId: dto.operatorId }
+                : {}),
+              ...(dto.observations !== undefined
+                ? { observations: dto.observations }
+                : {}),
+              ...(dto.parameters !== undefined
+                ? { parameters: dto.parameters }
+                : {}),
+              ...(values !== undefined
+                ? { parameterValues: { deleteMany: {}, create: values } }
+                : {}),
+              revision: { increment: 1 },
+            },
+            include: historyInclude,
+          });
+          await tx.stepCorrection.create({
+            data: {
+              stepId,
+              revision: updated.revision,
+              correctedById: actor.id,
+              reason: dto.reason,
+              beforeSnapshot,
+              afterSnapshot: JSON.parse(
+                JSON.stringify(serializeStep(updated)),
+              ) as Prisma.InputJsonValue,
+            },
+          });
+          return serializeStep(updated);
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        ['P2002', 'P2034', 'P2025', 'P2003'].includes(error.code)
+      )
+        throw new ConflictException(
+          'La correction est en conflit avec une autre modification.',
+        );
+      throw error;
+    }
+  }
+
+  async findCorrections(sampleId: string, stepId: string) {
+    const step = await this.prisma.fabricationStep.findFirst({
+      where: { id: stepId, sampleId },
+      select: { id: true },
+    });
+    if (!step)
+      throw new NotFoundException('Étape introuvable pour cet échantillon.');
+    return this.prisma.stepCorrection.findMany({
+      where: { stepId },
+      orderBy: { revision: 'asc' },
+      include: { correctedBy: { select: { id: true, name: true } } },
+    });
+  }
 
   async create(
     sampleId: string,

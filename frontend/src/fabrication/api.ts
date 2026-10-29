@@ -18,6 +18,7 @@ export type StepType = {
 }
 export type FabricationStep = {
   id: string
+  revision?: number
   operationName: string
   performedAt: string
   recordedAt: string
@@ -26,7 +27,11 @@ export type FabricationStep = {
   observations: string | null
   recordedBy: { id: string; name: string }
   operator: { id: string; name: string } | null
-  stepType: Pick<StepType, 'id' | 'code' | 'name' | 'isActive'> | null
+  stepType:
+    | (Pick<StepType, 'id' | 'code' | 'name' | 'isActive'> & {
+        parameters?: ParameterDefinition[]
+      })
+    | null
   parameterValues: {
     id: string
     definition: ParameterDefinition

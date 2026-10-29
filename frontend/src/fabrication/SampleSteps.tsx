@@ -5,6 +5,7 @@ import type { Sample } from '../samples/api'
 import { useSampleQuery } from '../samples/useSampleQuery'
 import { getSteps } from './api'
 import { StepForm } from './StepForm'
+import { StepCorrections } from './StepCorrections'
 
 export function SampleSteps({ sample }: { sample: Sample }) {
   const { api, user } = useAuth()
@@ -69,7 +70,10 @@ export function SampleSteps({ sample }: { sample: Sample }) {
       {history.data && (
         <ol className="step-history">
           {history.data.map((step) => (
-            <li className="sample-panel" key={step.id}>
+            <li
+              className="sample-panel"
+              key={`${step.id}:${step.revision ?? 0}`}
+            >
               <div className="step-heading">
                 <h3>{step.operationName}</h3>
                 <span
@@ -157,6 +161,12 @@ export function SampleSteps({ sample }: { sample: Sample }) {
                   </p>
                 </>
               )}
+              <StepCorrections
+                step={step}
+                sampleId={sample.id}
+                authorized={authorized}
+                onUpdated={history.retry}
+              />
             </li>
           ))}
         </ol>

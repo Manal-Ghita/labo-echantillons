@@ -1,0 +1,14 @@
+.step-corrections {
+  margin-top: 1.5rem;
+  border-top: 1px solid #dce5de;
+  padding-top: 1rem;
+}
+.step-corrections details {
+  overflow-wrap: anywhere;
+}
+.step-corrections summary {
+  cursor: pointer;
+}
+.step-corrections .sample-form {
+  margin-block: 1rem;
+}
