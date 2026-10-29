@@ -1307,6 +1307,123 @@ async function main() {
                 `${viewport.name}: abandon/reactivate confirmation, ownership guards, steps blocked while abandoned and complete history preserved`,
               );
 
+              stage = `${viewport.name}: corrected PVD value and identical search resubmission`;
+              const pvd = await http(adminPage, '/step-types', 'POST', {
+                code: `DEPOT_PVD-${randomUUID()}`,
+                name: 'Deposition PVD',
+                parameters: [
+                  {
+                    key: 'epaisseur_nm',
+                    name: 'Thickness',
+                    unit: 'nm',
+                    dataType: 'NUMBER',
+                    isRequired: true,
+                  },
+                ],
+              });
+              assert.equal(pvd.status, 201);
+              const thickness = pvd.body.parameters[0].id;
+              const wafer = await http(ownerPage, '/samples', 'POST', {
+                reference: `TEST-WAFER-001-${randomUUID()}`,
+                name: 'Wafer silicium - essai PVD',
+              });
+              assert.equal(wafer.status, 201);
+              const filter = `/samples?parameterDefinitionId=${thickness}&min=40&max=45`;
+              await ownerPage.goto(`http://localhost:5180${filter}`);
+              await expect(
+                ownerPage.getByText('Aucun résultat', { exact: true }),
+              ).toBeVisible();
+              const pvdStep = (value, result) => ({
+                stepTypeId: pvd.body.id,
+                performedAt: '2026-10-29T09:30:00Z',
+                result,
+                parameterValues: [{ definitionId: thickness, value }],
+              });
+              const first = await http(
+                ownerPage,
+                `/samples/${wafer.body.id}/steps`,
+                'POST',
+                pvdStep('42.125', 'SUCCESS'),
+              );
+              assert.equal(first.status, 201);
+              assert.equal(
+                (
+                  await http(
+                    ownerPage,
+                    `/samples/${wafer.body.id}/steps`,
+                    'POST',
+                    pvdStep('37.5', 'FAILURE'),
+                  )
+                ).status,
+                201,
+              );
+              assert.equal(
+                (
+                  await http(
+                    ownerPage,
+                    `/samples/${wafer.body.id}/steps/${first.body.id}/corrections`,
+                    'POST',
+                    {
+                      expectedRevision: 0,
+                      reason: 'Correct measured thickness',
+                      parameterValues: [
+                        { definitionId: thickness, value: '42.375' },
+                      ],
+                    },
+                  )
+                ).status,
+                201,
+              );
+              const refreshed = ownerPage.waitForResponse(
+                (response) =>
+                  response.url() === `http://localhost:3100${filter}` &&
+                  response.request().method() === 'GET',
+              );
+              await ownerPage
+                .getByRole('button', { name: 'Rechercher', exact: true })
+                .click();
+              const refreshedResponse = await refreshed;
+              assert.equal(refreshedResponse.status(), 200);
+              assert.equal(
+                (await refreshedResponse.json()).some(
+                  (sample) => sample.id === wafer.body.id,
+                ),
+                true,
+              );
+              await expect(
+                ownerPage.getByRole('link', {
+                  name: wafer.body.name,
+                }),
+              ).toBeVisible();
+              for (const reader of [ownerPage, otherPage, adminPage]) {
+                const matches = await http(reader, filter);
+                assert.equal(matches.status, 200);
+                assert.equal(
+                  matches.body.some((sample) => sample.id === wafer.body.id),
+                  true,
+                );
+              }
+              const currentSteps = await http(
+                ownerPage,
+                `/samples/${wafer.body.id}/steps`,
+              );
+              assert.equal(
+                currentSteps.body.find((step) => step.id === first.body.id)
+                  .parameterValues[0].numericValue,
+                '42.375',
+              );
+              assert.equal(
+                currentSteps.body.some(
+                  (step) =>
+                    step.result === 'FAILURE' &&
+                    step.parameterValues[0].numericValue === '37.5',
+                ),
+                true,
+              );
+              report(
+                `${viewport.name}: PVD 42.125 corrected to 42.375 plus FAILURE 37.5; identical inclusive 40-45 search refreshes React and remains readable by all roles`,
+              );
+
               stage = `${viewport.name}: logout and network isolation`;
               await ownerPage
                 .getByRole('button', { name: 'Se déconnecter', exact: true })

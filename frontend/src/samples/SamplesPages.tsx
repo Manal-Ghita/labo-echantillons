@@ -81,6 +81,14 @@ export function SamplesPage() {
             const field = String(form.get(key) || '').trim()
             if (field) params.set(key, field)
           }
+          // A new submission must refresh data even if the URL filters did not change.
+          if (
+            (params.get('q') ?? '') === q &&
+            (params.get('parameterDefinitionId') ?? '') === definitionId &&
+            (params.get('min') ?? '') === min &&
+            (params.get('max') ?? '') === max
+          )
+            result.retry()
           setSearch(params)
         }}
       >

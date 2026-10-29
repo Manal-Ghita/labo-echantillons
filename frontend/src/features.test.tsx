@@ -238,6 +238,60 @@ describe('Comptes RESEARCHER', () => {
   )
 })
 describe('Recherche et état', () => {
+  it('retrouve TEST-WAFER-001 après correction PVD en relançant les mêmes bornes 40–45', async () => {
+    actor.role = 'RESEARCHER'
+    const definitionId = 'e1492d7d-060d-4750-8a7c-65cba9051930'
+    const pvd = { ...type, code: 'DEPOT_PVD', name: 'Déposition PVD' }
+    const thickness = {
+      ...definition,
+      id: definitionId,
+      key: 'epaisseur_nm',
+      name: 'Épaisseur',
+      unit: 'nm',
+      stepType: pvd,
+    }
+    const wafer = {
+      ...original,
+      reference: 'TEST-WAFER-001',
+      name: 'Wafer silicium — essai PVD',
+    }
+    let steps: { result: string; numericValue: string; revision: number }[] = []
+    fetcher.mockImplementation(async (url, options) => {
+      if (url.endsWith('/auth/me')) return Response.json(actor)
+      if (url.endsWith('/samples/numeric-parameters'))
+        return Response.json([thickness])
+      const params = new URL(url).searchParams
+      expect(options.method ?? 'GET').toBe('GET')
+      expect(params.get('parameterDefinitionId')).toBe(definitionId)
+      expect(params.get('min')).toBe('40')
+      expect(params.get('max')).toBe('45')
+      const matches = steps.some(
+        (step) =>
+          Number(step.numericValue) >= 40 && Number(step.numericValue) <= 45,
+      )
+      return Response.json(matches ? [wafer] : [])
+    })
+    open(`/samples?parameterDefinitionId=${definitionId}&min=40&max=45`)
+    await screen.findByRole('heading', { name: 'Aucun résultat' })
+    await screen.findByRole('option', {
+      name: 'DEPOT_PVD — Déposition PVD / Épaisseur (nm)',
+    })
+    // Changes made in another tab must be visible when this list is resubmitted.
+    steps = [
+      { result: 'SUCCESS', numericValue: '42.125', revision: 0 },
+      { result: 'FAILURE', numericValue: '37.5', revision: 0 },
+    ]
+    steps[0] = { result: 'SUCCESS', numericValue: '42.375', revision: 1 }
+    await userEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect(await screen.findByRole('link', { name: wafer.name })).toBeVisible()
+    expect(
+      fetcher.mock.calls.filter(
+        ([url]) => new URL(url).pathname === '/samples',
+      ),
+    ).toHaveLength(2)
+    expect(screen.getByLabelText('Valeur minimale')).toHaveValue('40')
+    expect(screen.getByLabelText('Valeur maximale')).toHaveValue('45')
+  })
   it('affiche les paramètres archivés déjà utilisés', async () => {
     const originalFetch = fetcher.getMockImplementation()!
     fetcher.mockImplementation((url, options) =>
