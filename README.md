@@ -1,7 +1,8 @@
 # Les échantillons du labo
 
-Backend du projet ISMIN 2026 : suivi des échantillons de microélectronique.
-NestJS et TypeScript, Prisma 7.10.1, PostgreSQL, authentification JWT.
+Projet ISMIN 2026 : suivi des échantillons de microélectronique.
+Backend NestJS/TypeScript, Prisma 7.10.1 et PostgreSQL ; frontend React/TypeScript avec Vite.
+Le frontend dispose de la connexion JWT et de deux pages privées provisoires.
 
 ## Installation et configuration
 
@@ -53,6 +54,29 @@ Il n'existe aucune inscription publique. Pour le premier administrateur, défini
 
 Le contrat de saisie des étapes, les décimaux exacts et la compatibilité des historiques
 sont décrits dans [backend/FABRICATION.md](backend/FABRICATION.md).
+
+## Frontend React
+
+Dans un second terminal :
+
+```sh
+cd frontend
+npm ci
+# Copier .env.example vers .env si une URL API différente est nécessaire.
+npm run dev
+```
+
+Ouvrir `http://localhost:5173`. Le frontend appelle par défaut `http://localhost:3000`.
+`VITE_API_URL` est une configuration publique, sans secret. Le backend accepte
+uniquement l'origine configurée par `WEB_ORIGIN` (par défaut `http://localhost:5173`).
+Après changement de configuration CORS, redémarrer l'API.
+La connexion utilise un compte déjà existant ; aucun compte n'est créé par le frontend.
+Les pages Échantillons/Catalogue sont provisoires, sans formulaire ni appel métier.
+
+Dans `frontend` : `npm run build`, `npm test`, `npm run lint` et, pour les essais
+navigateur desktop/mobile, `npm run test:browser`.
+Les tests utilisent des réponses API simulées et ne touchent pas PostgreSQL.
+Configuration des sessions et détails des tests : [frontend/README.md](frontend/README.md).
 
 ## Vérifications
 

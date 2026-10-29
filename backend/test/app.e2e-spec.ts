@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { configureCors } from '../src/configure-cors';
 import {
   createStepInput,
   exactDecimal,
@@ -37,6 +38,7 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    configureCors(app, 'http://localhost:5173');
     await app.init();
     token = await moduleFixture.get(JwtService).signAsync({ sub: userId });
   });
@@ -65,6 +67,32 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
     await request(app.getHttpServer())
       .get('/health')
       .expect(200, { status: 'ok', database: 'up' });
+  });
+
+  it('autorise le preflight Authorization de la seule origine frontend configurée', async () => {
+    const response = await request(app.getHttpServer())
+      .options('/auth/login')
+      .set('Origin', 'http://localhost:5173')
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'authorization,content-type')
+      .expect(204);
+    expect(response.headers['access-control-allow-origin']).toBe(
+      'http://localhost:5173',
+    );
+    expect(response.headers['access-control-allow-headers']).toContain(
+      'Authorization',
+    );
+    expect(
+      response.headers['access-control-allow-credentials'],
+    ).toBeUndefined();
+  });
+
+  it('ne renvoie aucun en-tête CORS pour une autre origine', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/health')
+      .set('Origin', 'https://external.example')
+      .expect(200);
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
   });
 
   it('GET /health signale une panne PostgreSQL', async () => {

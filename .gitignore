@@ -33,3 +33,6 @@ pids/
 *.pid
 *.pid.lock
 report.*.json
+playwright-report/
+test-results/
+dist-ssr/
