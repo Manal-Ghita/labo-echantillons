@@ -18,43 +18,151 @@ enum Role {
   RESEARCHER
 }
 
+enum ParameterDataType {
+  NUMBER
+  TEXT
+  BOOLEAN
+}
+
+enum StepResult {
+  SUCCESS
+  FAILURE
+}
+
+enum SampleStatus {
+  ACTIVE
+  ABANDONED
+}
+
 model User {
-  id            String            @id @default(uuid()) @db.Uuid
-  name          String
-  email         String            @unique
-  passwordHash  String
-  role          Role
-  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
-  samples       Sample[]
-  recordedSteps FabricationStep[]
+  id              String            @id @default(uuid()) @db.Uuid
+  name            String
+  email           String            @unique
+  passwordHash    String
+  role            Role
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+  samples         Sample[]
+  recordedSteps   FabricationStep[] @relation("StepRecorder")
+  operatedSteps   FabricationStep[] @relation("StepOperator")
+  createdBatches  Batch[]
+  stepCorrections StepCorrection[]
 }
 
 model Sample {
-  id          String            @id @default(uuid()) @db.Uuid
-  reference   String            @unique
-  name        String
-  description String?
-  creatorId   String            @db.Uuid
-  creator     User              @relation(fields: [creatorId], references: [id], onDelete: Restrict)
-  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
-  steps       FabricationStep[]
+  id           String            @id @default(uuid()) @db.Uuid
+  reference    String            @unique
+  name         String
+  description  String?
+  creatorId    String            @db.Uuid
+  creator      User              @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  createdAt    DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime          @updatedAt @db.Timestamptz(3)
+  steps        FabricationStep[] @relation("SampleSteps")
+  batchId      String?           @db.Uuid
+  batch        Batch?            @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  parentId     String?           @db.Uuid
+  parent       Sample?           @relation("SampleLineage", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Sample[]          @relation("SampleLineage")
+  originStepId String?           @db.Uuid
+  originStep   FabricationStep?  @relation("SampleOrigin", fields: [originStepId], references: [id], onDelete: Restrict)
+  status       SampleStatus?
 
   @@index([creatorId])
+  @@index([batchId])
+  @@index([parentId])
+  @@index([originStepId])
+  @@index([status])
 }
 
 model FabricationStep {
-  id            String   @id @default(uuid()) @db.Uuid
-  sampleId      String   @db.Uuid
-  sample        Sample   @relation(fields: [sampleId], references: [id], onDelete: Restrict)
-  operationName String
-  performedAt   DateTime @db.Timestamptz(3)
-  parameters    String?
-  observations  String?
-  recordedById  String   @db.Uuid
-  recordedBy    User     @relation(fields: [recordedById], references: [id], onDelete: Restrict)
-  recordedAt    DateTime @default(now()) @db.Timestamptz(3)
+  id              String               @id @default(uuid()) @db.Uuid
+  sampleId        String               @db.Uuid
+  sample          Sample               @relation("SampleSteps", fields: [sampleId], references: [id], onDelete: Restrict)
+  operationName   String
+  performedAt     DateTime             @db.Timestamptz(3)
+  parameters      String?
+  observations    String?
+  recordedById    String               @db.Uuid
+  recordedBy      User                 @relation("StepRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  recordedAt      DateTime             @default(now()) @db.Timestamptz(3)
+  stepTypeId      String?              @db.Uuid
+  stepType        StepType?            @relation(fields: [stepTypeId], references: [id], onDelete: Restrict)
+  result          StepResult?
+  operatorId      String?              @db.Uuid
+  operator        User?                @relation("StepOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  revision        Int                  @default(0)
+  parameterValues StepParameterValue[]
+  corrections     StepCorrection[]
+  derivedSamples  Sample[]             @relation("SampleOrigin")
 
   @@index([sampleId, performedAt])
   @@index([recordedById])
+  @@index([stepTypeId, performedAt])
+  @@index([operatorId])
+}
+
+model Batch {
+  id          String   @id @default(uuid()) @db.Uuid
+  reference   String   @unique
+  createdById String   @db.Uuid
+  createdBy   User     @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  samples     Sample[]
+
+  @@index([createdById])
+}
+
+model StepType {
+  id          String                @id @default(uuid()) @db.Uuid
+  code        String                @unique
+  name        String
+  description String?
+  isActive    Boolean               @default(true)
+  createdAt   DateTime              @default(now()) @db.Timestamptz(3)
+  parameters  ParameterDefinition[]
+  steps       FabricationStep[]
+}
+
+model ParameterDefinition {
+  id         String               @id @default(uuid()) @db.Uuid
+  stepTypeId String               @db.Uuid
+  stepType   StepType             @relation(fields: [stepTypeId], references: [id], onDelete: Restrict)
+  key        String
+  name       String
+  dataType   ParameterDataType
+  unit       String?
+  isRequired Boolean
+  values     StepParameterValue[]
+
+  @@unique([stepTypeId, key])
+}
+
+model StepParameterValue {
+  id           String              @id @default(uuid()) @db.Uuid
+  stepId       String              @db.Uuid
+  step         FabricationStep     @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  definitionId String              @db.Uuid
+  definition   ParameterDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  numericValue Decimal?            @db.Decimal(65, 30)
+  textValue    String?
+  booleanValue Boolean?
+
+  @@unique([stepId, definitionId])
+  @@index([definitionId, numericValue])
+}
+
+model StepCorrection {
+  id             String          @id @default(uuid()) @db.Uuid
+  stepId         String          @db.Uuid
+  step           FabricationStep @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  revision       Int
+  correctedById  String          @db.Uuid
+  correctedBy    User            @relation(fields: [correctedById], references: [id], onDelete: Restrict)
+  correctedAt    DateTime        @default(now()) @db.Timestamptz(3)
+  reason         String
+  beforeSnapshot Json
+  afterSnapshot  Json
+
+  @@unique([stepId, revision])
+  @@index([correctedById, correctedAt])
 }

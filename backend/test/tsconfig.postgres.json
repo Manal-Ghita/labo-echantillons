@@ -5,5 +5,5 @@
     "incremental": false,
     "rootDir": ".."
   },
-  "include": ["admin.postgres-spec.ts"]
+  "include": ["*.postgres-spec.ts"]
 }

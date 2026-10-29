@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "test:migration": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-migration.json --runInBand",
     "test:postgres": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest-postgres.json --runInBand",
     "admin:create": "npm run build && node dist/auth/create-admin.js",
     "db:validate": "prisma validate --config prisma.config.ts",
