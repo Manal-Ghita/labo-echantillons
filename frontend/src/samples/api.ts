@@ -20,11 +20,19 @@ export type CreateSample = {
   description?: string
 }
 
-export const listSamples = (api: ApiClient, q: string, signal: AbortSignal) =>
-  api.request<Sample[]>(
-    `/samples${q ? `?${new URLSearchParams({ q })}` : ''}`,
-    { signal },
-  )
+export const listSamples = (
+  api: ApiClient,
+  q: string,
+  signal: AbortSignal,
+  numeric: Record<string, string> = {},
+) => {
+  const params = new URLSearchParams(q ? { q } : {})
+  for (const [key, value] of Object.entries(numeric))
+    if (value) params.set(key, value)
+  return api.request<Sample[]>(`/samples${params.size ? `?${params}` : ''}`, {
+    signal,
+  })
+}
 
 export const getSample = (api: ApiClient, id: string, signal: AbortSignal) =>
   api.request<Sample>(`/samples/${encodeURIComponent(id)}`, { signal })

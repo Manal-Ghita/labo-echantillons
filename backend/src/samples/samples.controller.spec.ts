@@ -35,7 +35,10 @@ describe('SamplesController HTTP (service simulé)', () => {
   it('transmet la recherche', async () => {
     service.findAll.mockResolvedValue([]);
     await request(app.getHttpServer()).get('/samples?q=film').expect(200);
-    expect(service.findAll).toHaveBeenCalledWith('film');
+    expect(service.findAll).toHaveBeenCalledWith(
+      'film',
+      expect.objectContaining({ q: 'film' }),
+    );
   });
   it.each([
     '/samples?q=a&q=b',

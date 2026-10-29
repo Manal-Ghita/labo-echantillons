@@ -32,7 +32,12 @@ export class SamplesController {
 
   @Get()
   findAll(@Query() query: ListSamplesDto) {
-    return this.samples.findAll(query.q);
+    return this.samples.findAll(query.q, query);
+  }
+
+  @Get('numeric-parameters')
+  numericParameters() {
+    return this.samples.numericParameters();
   }
 
   @Get(':id')
@@ -46,4 +51,5 @@ export class SamplesController {
   create(@Body() dto: CreateSampleDto, @Req() request: AuthenticatedRequest) {
     return this.samples.create(dto, request.user.id);
   }
+
 }

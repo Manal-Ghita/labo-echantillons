@@ -11,6 +11,7 @@ import {
 } from './api'
 import { useSampleQuery } from './useSampleQuery'
 import { SampleSteps } from '../fabrication/SampleSteps'
+import { NumericSearch } from './NumericSearch'
 
 function QueryError({
   message,
@@ -35,9 +36,18 @@ export function SamplesPage() {
   const { api } = useAuth()
   const [search, setSearch] = useSearchParams()
   const q = search.get('q')?.trim() || ''
+  const definitionId = search.get('parameterDefinitionId') || ''
+  const min = search.get('min') || ''
+  const max = search.get('max') || ''
+  const [advanced, setAdvanced] = useState(false)
   const load = useCallback(
-    (signal: AbortSignal) => listSamples(api, q, signal),
-    [api, q],
+    (signal: AbortSignal) =>
+      listSamples(api, q, signal, {
+        parameterDefinitionId: definitionId,
+        min,
+        max,
+      }),
+    [api, q, definitionId, min, max],
   )
   const result = useSampleQuery(load)
   return (
@@ -55,7 +65,7 @@ export function SamplesPage() {
         </Link>
       </div>
       <form
-        key={q}
+        key={`${q}:${definitionId}:${min}:${max}`}
         className="sample-search"
         role="search"
         onSubmit={(event) => {
@@ -63,7 +73,13 @@ export function SamplesPage() {
           const value = String(
             new FormData(event.currentTarget).get('q') || '',
           ).trim()
-          setSearch(value ? { q: value } : {})
+          const params = new URLSearchParams(value ? { q: value } : {})
+          const form = new FormData(event.currentTarget)
+          for (const key of ['parameterDefinitionId', 'min', 'max']) {
+            const field = String(form.get(key) || '').trim()
+            if (field) params.set(key, field)
+          }
+          setSearch(params)
         }}
       >
         <div className="field">
@@ -76,10 +92,21 @@ export function SamplesPage() {
             placeholder="Ex. K24-017"
           />
         </div>
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={() => setAdvanced((current) => !current)}
+          aria-expanded={advanced || !!definitionId || !!min || !!max}
+        >
+          Recherche par paramètres
+        </button>
+        {(advanced || definitionId || min || max) && (
+          <NumericSearch definitionId={definitionId} min={min} max={max} />
+        )}
         <button className="button button-primary" type="submit">
           Rechercher
         </button>
-        {q && (
+        {(q || definitionId || min || max) && (
           <button
             className="button button-secondary"
             type="button"
@@ -100,7 +127,9 @@ export function SamplesPage() {
           </p>
           {result.data.length === 0 ? (
             <div className="placeholder-card">
-              <h2>{q ? 'Aucun résultat' : 'Aucun échantillon'}</h2>
+              <h2>
+                {q || definitionId ? 'Aucun résultat' : 'Aucun échantillon'}
+              </h2>
               <p>
                 {q
                   ? 'Essayez une autre référence ou un autre nom.'
