@@ -29,6 +29,8 @@ Le Compose actuel démarre uniquement PostgreSQL ; la conteneurisation de l'API 
 - `GET /auth/me` : identité, JWT requis.
 - `GET /samples`, `GET /samples?q=film`, `GET /samples/:id` : consultation authentifiée.
 - `POST /samples` : création, JWT requis, rôle ADMIN ou RESEARCHER.
+- `POST /samples/:sampleId/steps` : étape et paramètres structurés, propriétaire ou ADMIN.
+- `GET /samples/:sampleId/steps` : historique chronologique, tout utilisateur authentifié.
 - `GET /step-types`, `GET /step-types/:id` : types actifs et définitions, JWT requis.
 - `GET /step-types?includeInactive=true` : inclut les types inactifs, ADMIN uniquement.
 - `POST /step-types`, `PATCH /step-types/:id` : administration du catalogue, ADMIN uniquement.
@@ -49,6 +51,9 @@ la consultation individuelle d'un type inactif ; ADMIN peut encore le consulter.
 
 Il n'existe aucune inscription publique. Pour le premier administrateur, définir les variables locales `ADMIN_*` et utiliser `npm run admin:create` après autorisation. Détails dans [backend/AUTH.md](backend/AUTH.md).
 
+Le contrat de saisie des étapes, les décimaux exacts et la compatibilité des historiques
+sont décrits dans [backend/FABRICATION.md](backend/FABRICATION.md).
+
 ## Vérifications
 
 Dans `backend` :
@@ -68,6 +73,9 @@ L'intégration du catalogue se lance séparément avec `npm run test:step-types:
 après autorisation, exclusivement sur `labo_echantillons_test` déjà migrée.
 Ses comptes et données fictifs sont annulés par transaction ; détails dans
 [backend/test/STEP-TYPES-TEST.md](backend/test/STEP-TYPES-TEST.md).
+L'intégration des étapes utilise `npm run test:fabrication:postgres`, après autorisation,
+sur cette même base dédiée. Ses fixtures sont annulées par transaction et savepoints ;
+voir [backend/test/FABRICATION-STEPS-TEST.md](backend/test/FABRICATION-STEPS-TEST.md).
 
 À la racine, `git diff --check` vérifie les espaces des modifications suivies.
 Les schémas et migrations Prisma sont versionnés ; le client généré, `node_modules`, `dist` et les secrets restent ignorés.
