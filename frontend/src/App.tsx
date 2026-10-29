@@ -2,7 +2,11 @@ import { Navigate, Route, Routes } from 'react-router'
 import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import {
+  CatalogueDetailPage,
+  CataloguePage,
+  CreateCataloguePage,
+} from './catalogue/CataloguePages'
 import {
   CreateSamplePage,
   SampleDetailPage,
@@ -19,10 +23,11 @@ export function App() {
           <Route path="/samples" element={<SamplesPage />} />
           <Route path="/samples/new" element={<CreateSamplePage />} />
           <Route path="/samples/:id" element={<SampleDetailPage />} />
-          <Route
-            path="/step-types"
-            element={<PlaceholderPage kind="catalog" />}
-          />
+          <Route path="/step-types" element={<CataloguePage />} />
+          <Route element={<RequireAuth roles={['ADMIN']} />}>
+            <Route path="/step-types/new" element={<CreateCataloguePage />} />
+          </Route>
+          <Route path="/step-types/:id" element={<CatalogueDetailPage />} />
           <Route
             path="*"
             element={

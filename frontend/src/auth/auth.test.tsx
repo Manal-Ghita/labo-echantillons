@@ -39,7 +39,7 @@ function validApi(role = 'RESEARCHER') {
       Response.json(
         url.endsWith('/auth/login')
           ? loginResponse
-          : url.includes('/samples')
+          : url.includes('/samples') || url.includes('/step-types')
             ? []
             : { ...profile, role },
       ),

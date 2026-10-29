@@ -39,7 +39,7 @@ test('connexion, navigation, rechargement et déconnexion sans débordement hori
         'Bearer browser-test-token',
       )
       await route.fulfill({ headers: cors, json: profile })
-    } else if (path === '/samples') {
+    } else if (path === '/samples' || path === '/step-types') {
       await route.fulfill({ headers: cors, json: [] })
     } else throw new Error('Appel métier inattendu pendant cette sous-phase.')
   })
