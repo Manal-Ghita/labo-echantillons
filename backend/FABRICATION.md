@@ -33,8 +33,8 @@ libre n'est acceptée dans les valeurs. Les UUID de définitions sont comparés 
 distinction de casse, comme PostgreSQL.
 
 Seul le propriétaire (`creatorId`) ou ADMIN peut créer une étape. Le statut
-ABANDONED bloque la création pour les deux rôles ; aucune réactivation n'est
-implémentée dans cette sous-phase. Un ancien statut NULL n'est pas modifié et
+ABANDONED bloque la création pour les deux rôles ; le propriétaire ou ADMIN peut
+réactiver explicitement l'échantillon via `PATCH /samples/:id/status`. Un ancien statut NULL n'est pas modifié et
 ne bloque pas l'enregistrement.
 
 La lecture des règles et la création sont effectuées dans une transaction Prisma
@@ -64,3 +64,6 @@ Les tests ordinaires et e2e utilisent Prisma simulé. L'intégration réelle se 
 séparément, après autorisation, avec `npm run test:fabrication:postgres`, exclusivement
 sur `labo_echantillons_test`. Les 22 scénarios, dont une erreur SQL forcée et son
 rollback, ont été vérifiés ; détails dans [test/FABRICATION-STEPS-TEST.md](test/FABRICATION-STEPS-TEST.md).
+
+Les corrections motivées, leurs révisions, la recherche numérique et les changements
+d'état sont détaillés dans [SEARCH-AND-CORRECTIONS.md](SEARCH-AND-CORRECTIONS.md).

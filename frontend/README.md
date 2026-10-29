@@ -42,7 +42,32 @@ Adapter cette valeur puis redémarrer NestJS si l'origine frontend change.
   fourni par l'API, avec auteurs, opérateurs et anciens paramètres textuels.
   Le propriétaire ou ADMIN peut ouvrir la saisie d'une étape, sauf si l'échantillon
   est abandonné. Les autorisations définitives sont vérifiées par le backend.
-- `/step-types` : page privée provisoire du catalogue.
+- `/step-types` : catalogue actif via `GET /step-types`, accessible à tout utilisateur connecté.
+  ADMIN peut inclure les types inactifs avec `includeInactive=true`.
+- `/step-types/:id` : détail du type et de ses paramètres (clé, nom, type, unité, obligation).
+  ADMIN peut modifier le nom, la description et l'état actif via `PATCH /step-types/:id`.
+- `/step-types/new` : création ADMIN via `POST /step-types`, avec zéro ou plusieurs
+  définitions NUMBER/TEXT/BOOLEAN. Les clés sont uniques dans le type et sensibles à la casse.
+  Le code et les définitions restent immuables après création ; aucun DELETE n'est proposé.
+- `/users` : espace ADMIN de consultation des comptes et de création contrôlée de
+  RESEARCHER (nom, email, mot de passe initial confirmé). Aucun champ de choix du rôle.
+  Les mots de passe ne sont ni persistés dans le navigateur ni renvoyés par l'API.
+
+La recherche des échantillons peut combiner `q` et `parameterDefinitionId`, `min`,
+`max`. Les bornes sont inclusives, envoyées comme chaînes sans conversion numérique.
+Une correspondance porte sur une même valeur courante de n'importe quelle étape,
+y compris échouée ; les anciennes valeurs conservées dans le journal ne sont pas recherchées.
+Le sélecteur charge `GET /samples/numeric-parameters` : définitions NUMBER des types
+actifs ou déjà utilisées dans un historique, y compris les opérations archivées.
+Les définitions des types inactifs inutilisés ne sont pas exposées par cette liste.
+Un filtre par UUID historique partagé dans l'URL reste également utilisable.
+
+La fiche permet au propriétaire ou à ADMIN d'abandonner ou réactiver l'échantillon,
+avec confirmation. L'abandon conserve les historiques et interdit les nouvelles étapes.
+Chaque étape propose une correction motivée aux mêmes utilisateurs, avec contrôle de
+révision et journal avant/après lisible par tous les utilisateurs authentifiés.
+Une correction historique reste possible sur un échantillon abandonné ou un type
+désactivé ; elle ne change ni le type ni l'auteur initial.
 - Le profil est récupéré par `GET /auth/me` avec `Authorization: Bearer <token>`.
   Ses champs sont `id`, `name`, `email`, `role` et `createdAt`. Aucun rôle n'est
   déduit d'un JWT décodé ou d'un profil enregistré dans le navigateur.
@@ -89,6 +114,9 @@ les refus 401/403, la protection des routes, les rôles, l'expiration et la déc
 ainsi que liste, recherche, détail, création et erreurs 400/404/409/réseau.
 Ils couvrent aussi les autorisations et l'historique des étapes, les paramètres
 dynamiques, les décimaux à forte précision et les enregistrements SUCCESS/FAILURE.
+Le catalogue est testé avec API simulée : consultation RESEARCHER, administration
+ADMIN, validation des définitions, conflits et activation/désactivation conservant
+les paramètres. Ses styles sont limités à `.catalogue-page`, sans modification du CSS de connexion.
 Les tests Playwright exercent aussi le parcours liste → recherche → détail → création,
 navigation, rechargement, erreur de connexion et
 absence de débordement horizontal à 1440×1000 et 375×812.

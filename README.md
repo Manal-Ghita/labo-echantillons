@@ -6,10 +6,10 @@ Le frontend propose la connexion JWT, les échantillons et leurs étapes de fabr
 
 ## Démarrage Docker complet
 
-Configuration préparée pour le volume existant `labo-echantillons_postgres_data`.
-Il est déclaré externe : Compose le réutilise et refuse de démarrer s'il manque.
-Sur une autre machine, la création ou la restauration du volume doit être décidée
-explicitement avant le premier lancement. Ne pas changer son nom pour contourner une erreur.
+Le volume porte le nom stable `labo-echantillons_postgres_data` : Compose réutilise
+le volume actuel et le crée automatiquement s'il manque sur une machine neuve.
+Aucune création manuelle de volume n'est nécessaire. Ne pas changer ce nom pour
+contourner une erreur et ne jamais supprimer un volume contenant des données.
 
 Compléter le `.env` racine existant à partir des clés de `.env.example`, sans
 l'écraser : conserver exactement `POSTGRES_PASSWORD`, ajouter un `JWT_SECRET`
@@ -20,10 +20,11 @@ Les URL publiques par défaut sont `WEB_ORIGIN=http://localhost:8080` et
 remplacer `localhost` dans les deux URL par le nom accessible, puis reconstruire.
 `VITE_API_URL` est intégré au build ; ce n'est jamais une adresse Docker interne.
 
-Après autorisation de démarrage, depuis la racine :
+Sur une machine neuve, copier `.env.example` vers `.env` et choisir les deux secrets
+locaux (mot de passe PostgreSQL et JWT). Sur une installation existante, conserver
+leurs valeurs. Après cette configuration, une seule commande démarre toute la stack :
 
 ```sh
-docker compose config --quiet
 docker compose up --build
 ```
 
@@ -89,8 +90,13 @@ Ce mode local permet de garder NestJS en développement ; le Compose complet dé
 - `GET /auth/me` : identité, JWT requis.
 - `GET /samples`, `GET /samples?q=film`, `GET /samples/:id` : consultation authentifiée.
 - `POST /samples` : création, JWT requis, rôle ADMIN ou RESEARCHER.
+- `GET /samples?parameterDefinitionId=UUID&min=0.125&max=100` : recherche numérique authentifiée, combinable avec `q`.
+- `PATCH /samples/:id/status` : `{ "status": "ACTIVE" }` ou `ABANDONED`, propriétaire ou ADMIN, sans suppression d'historique.
 - `POST /samples/:sampleId/steps` : étape et paramètres structurés, propriétaire ou ADMIN.
 - `GET /samples/:sampleId/steps` : historique chronologique, tout utilisateur authentifié.
+- `POST /samples/:sampleId/steps/:stepId/corrections` : correction avec motif et révision attendue, propriétaire ou ADMIN.
+- `GET /samples/:sampleId/steps/:stepId/corrections` : journal avant/après accessible aux utilisateurs authentifiés.
+- `GET /users`, `POST /users` : consultation des comptes et création de RESEARCHER, ADMIN uniquement ; aucun rôle client accepté.
 - `GET /step-types`, `GET /step-types/:id` : types actifs et définitions, JWT requis.
 - `GET /step-types?includeInactive=true` : inclut les types inactifs, ADMIN uniquement.
 - `POST /step-types`, `PATCH /step-types/:id` : administration du catalogue, ADMIN uniquement.
@@ -110,6 +116,9 @@ Il n'existe aucune route de suppression physique. Un chercheur reçoit 404 pour
 la consultation individuelle d'un type inactif ; ADMIN peut encore le consulter.
 
 Il n'existe aucune inscription publique. Pour le premier administrateur, définir les variables locales `ADMIN_*` et utiliser `npm run admin:create` après autorisation. Détails dans [backend/AUTH.md](backend/AUTH.md).
+Une fois connecté comme ADMIN, l'espace **Comptes** permet de créer un RESEARCHER.
+Le mot de passe initial est choisi par ADMIN, confirmé et effacé du formulaire après
+la requête ; il doit être communiqué au chercheur par un canal privé.
 
 Le contrat de saisie des étapes, les décimaux exacts et la compatibilité des historiques
 sont décrits dans [backend/FABRICATION.md](backend/FABRICATION.md).
@@ -131,8 +140,9 @@ uniquement l'origine configurée par `WEB_ORIGIN` (par défaut `http://localhost
 Après changement de configuration CORS, redémarrer l'API.
 La connexion utilise un compte déjà existant ; aucun compte n'est créé par le frontend.
 Les pages Échantillons permettent liste, recherche, création, détail et saisie des
-étapes avec historique. Le catalogue reste une page provisoire ; ses types actifs
-sont déjà chargés dynamiquement par le formulaire des étapes.
+étapes avec historique. Le catalogue permet la consultation des définitions et,
+pour ADMIN, leur création ainsi que la modification descriptive et l'activation
+ou désactivation des types. Les définitions existantes restent immuables.
 
 Dans `frontend` : `npm run build`, `npm test`, `npm run lint` et, pour les essais
 navigateur desktop/mobile, `npm run test:browser`.
@@ -164,3 +174,8 @@ voir [backend/test/FABRICATION-STEPS-TEST.md](backend/test/FABRICATION-STEPS-TES
 
 À la racine, `git diff --check` vérifie les espaces des modifications suivies.
 Les schémas et migrations Prisma sont versionnés ; le client généré, `node_modules`, `dist` et les secrets restent ignorés.
+
+La validation fonctionnelle avec vrai navigateur et vrai PostgreSQL est séparée des
+tests ordinaires : [dispositif transactionnel](backend/test/FUNCTIONAL-BROWSER-TEST.md).
+Elle n'utilise que `labo_echantillons_test`, annule ses fixtures et vérifie les
+empreintes avant/après ; ne pas la lancer contre la base principale.

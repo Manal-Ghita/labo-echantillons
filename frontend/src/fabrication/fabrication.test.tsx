@@ -116,7 +116,8 @@ async function fillForm(result = 'SUCCESS') {
     '2026-10-29T10:30:00',
   )
   await user.selectOptions(screen.getByLabelText('Résultat *'), result)
-  await user.type(screen.getByLabelText('Température (°C) *'), precise)
+  await user.click(screen.getByLabelText('Température (°C) *'))
+  await user.paste(precise)
   await user.type(screen.getByLabelText('Gaz'), 'Argon')
   await user.selectOptions(screen.getByLabelText('Sous vide *'), 'false')
   return user
