@@ -1,6 +1,7 @@
 import {
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -11,6 +12,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateSampleDto } from './dto/create-sample.dto';
 import { ListSamplesDto } from './dto/list-samples.dto';
 import { decimalValue } from '../fabrication-steps/decimal-value';
+import type { AuthenticatedUser } from '../auth/jwt-auth.guard';
+import type { SampleStatus } from '../generated/prisma/client';
 
 @Injectable()
 export class SamplesService {
@@ -110,6 +113,36 @@ export class SamplesService {
       where: Object.keys(where).length ? where : undefined,
       orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     });
+  }
+
+  async updateStatus(
+    id: string,
+    status: SampleStatus,
+    actor: Pick<AuthenticatedUser, 'id' | 'role'>,
+  ) {
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const sample = await tx.sample.findUnique({ where: { id } });
+          if (!sample) throw new NotFoundException('Échantillon introuvable.');
+          if (actor.role !== 'ADMIN' && sample.creatorId !== actor.id)
+            throw new ForbiddenException(
+              'Action réservée au propriétaire ou à ADMIN.',
+            );
+          return tx.sample.update({ where: { id }, data: { status } });
+        },
+        { isolationLevel: 'Serializable' },
+      );
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        ['P2034', 'P2025'].includes(error.code)
+      )
+        throw new ConflictException(
+          'L’échantillon a changé ; veuillez réessayer.',
+        );
+      throw error;
+    }
   }
 
   async findOne(id: string) {

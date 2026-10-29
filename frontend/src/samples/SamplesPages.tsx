@@ -12,6 +12,8 @@ import {
 import { useSampleQuery } from './useSampleQuery'
 import { SampleSteps } from '../fabrication/SampleSteps'
 import { NumericSearch } from './NumericSearch'
+import { StatusControl } from './StatusControl'
+import type { Sample } from './api'
 
 function QueryError({
   message,
@@ -178,7 +180,8 @@ export function SampleDetailPage() {
     [api, id],
   )
   const result = useSampleQuery(load)
-  const sample = result.data
+  const [updated, setUpdated] = useState<Sample | null>(null)
+  const sample = updated?.id === result.data?.id ? updated : result.data
   return (
     <section className="page">
       <Link className="back-link" to="/samples">
@@ -240,7 +243,15 @@ export function SampleDetailPage() {
               </div>
             </dl>
           </div>
-          <SampleSteps key={sample.id} sample={sample} />
+          <StatusControl
+            key={`status:${sample.id}:${sample.status}`}
+            sample={sample}
+            onUpdated={setUpdated}
+          />
+          <SampleSteps
+            key={`steps:${sample.id}:${sample.status}`}
+            sample={sample}
+          />
         </>
       )}
     </section>

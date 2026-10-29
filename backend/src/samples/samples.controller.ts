@@ -1,6 +1,7 @@
 import {
   Body,
   Post,
+  Patch,
   Req,
   UseGuards,
   Controller,
@@ -17,6 +18,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { CreateSampleDto } from './dto/create-sample.dto';
 import { ListSamplesDto } from './dto/list-samples.dto';
 import { SamplesService } from './samples.service';
+import { UpdateSampleStatusDto } from './dto/update-sample-status.dto';
 
 @Controller('samples')
 @UseGuards(JwtAuthGuard)
@@ -52,4 +54,12 @@ export class SamplesController {
     return this.samples.create(dto, request.user.id);
   }
 
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: UpdateSampleStatusDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.samples.updateStatus(id, dto.status, request.user);
+  }
 }
