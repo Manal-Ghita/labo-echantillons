@@ -75,5 +75,4 @@ services:
 
 volumes:
   postgres_data:
-    external: true
     name: labo-echantillons_postgres_data
