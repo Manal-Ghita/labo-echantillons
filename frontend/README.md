@@ -38,6 +38,10 @@ Adapter cette valeur puis redémarrer NestJS si l'origine frontend change.
 - `/samples/:id` : détail via `GET /samples/:id` (UUID technique).
   Le propriétaire est affiché par son identifiant : l'API ne fournit pas son nom.
   Un statut nul est affiché « Non renseigné », sans lui attribuer un état métier.
+  La fiche charge également `GET /samples/:id/steps`, dans l'ordre chronologique
+  fourni par l'API, avec auteurs, opérateurs et anciens paramètres textuels.
+  Le propriétaire ou ADMIN peut ouvrir la saisie d'une étape, sauf si l'échantillon
+  est abandonné. Les autorisations définitives sont vérifiées par le backend.
 - `/step-types` : page privée provisoire du catalogue.
 - Le profil est récupéré par `GET /auth/me` avec `Authorization: Bearer <token>`.
   Ses champs sont `id`, `name`, `email`, `role` et `createdAt`. Aucun rôle n'est
@@ -55,6 +59,22 @@ de déconnexion/révocation dans le contrat backend actuel. Un 401 d'une requêt
 ferme la session concernée ; un 403 affiche un refus sans déconnecter l'utilisateur.
 Une réponse tardive d'une ancienne session ne peut pas rétablir ou fermer la nouvelle.
 
+## Étapes de fabrication
+
+Le formulaire charge les types actifs depuis `GET /step-types`, puis envoie
+`POST /samples/:id/steps`. Après succès, seul l'historique est rechargé.
+Les types NUMBER/TEXT/BOOLEAN génèrent des champs selon leurs définitions et unités.
+Les décimaux restent des chaînes avec un point, sans exposant ni conversion en
+nombre JavaScript (capacité DECIMAL(65,30), aucun arrondi). Un booléen non renseigné
+est distinct de « Non » (`false`). Les valeurs facultatives non renseignées sont omises.
+Comme dans le backend, un paramètre TEXT obligatoire est présent même si son texte est vide.
+
+La date saisie en heure locale est envoyée au format ISO UTC. Le résultat est
+explicitement SUCCESS ou FAILURE ; aucune étape échouée ou répétée n'est masquée.
+L'opérateur facultatif est saisi par UUID d'utilisateur existant : l'API ne propose
+pas de liste d'utilisateurs. L'auteur de saisie n'est jamais envoyé par le formulaire.
+Les erreurs conservent la saisie ; un 401 ferme la session via le client HTTP commun.
+
 ## Vérifications
 
 ```sh
@@ -67,6 +87,8 @@ npm run test:browser
 Vitest/React Testing Library vérifient les contrats de connexion/profil, le client HTTP,
 les refus 401/403, la protection des routes, les rôles, l'expiration et la déconnexion,
 ainsi que liste, recherche, détail, création et erreurs 400/404/409/réseau.
+Ils couvrent aussi les autorisations et l'historique des étapes, les paramètres
+dynamiques, les décimaux à forte précision et les enregistrements SUCCESS/FAILURE.
 Les tests Playwright exercent aussi le parcours liste → recherche → détail → création,
 navigation, rechargement, erreur de connexion et
 absence de débordement horizontal à 1440×1000 et 375×812.

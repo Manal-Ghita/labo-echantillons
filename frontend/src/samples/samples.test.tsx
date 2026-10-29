@@ -56,7 +56,9 @@ beforeEach(() => {
   fetcher = vi.fn((url: string, options: RequestInit) =>
     url.endsWith('/auth/me')
       ? Promise.resolve(Response.json(profile))
-      : business(url, options),
+      : url.endsWith('/steps')
+        ? Promise.resolve(Response.json([]))
+        : business(url, options),
   )
   vi.stubGlobal('fetch', fetcher)
 })

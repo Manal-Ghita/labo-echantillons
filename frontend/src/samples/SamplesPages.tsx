@@ -10,6 +10,7 @@ import {
   sampleStatus,
 } from './api'
 import { useSampleQuery } from './useSampleQuery'
+import { SampleSteps } from '../fabrication/SampleSteps'
 
 function QueryError({
   message,
@@ -210,6 +211,7 @@ export function SampleDetailPage() {
               </div>
             </dl>
           </div>
+          <SampleSteps key={sample.id} sample={sample} />
         </>
       )}
     </section>

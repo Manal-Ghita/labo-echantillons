@@ -59,6 +59,8 @@ test('liste, recherche, création et détail accessibles sur desktop et mobile',
       }
       return route.fulfill({ headers: cors, json: [sample] })
     }
+    if (url.pathname === `/samples/${sample.id}/steps`)
+      return route.fulfill({ headers: cors, json: [] })
     if (url.pathname === `/samples/${sample.id}`)
       return route.fulfill({
         headers: cors,

@@ -500,6 +500,74 @@ textarea {
   font: inherit;
   color: inherit;
 }
+
+select {
+  font: inherit;
+  color: inherit;
+  max-width: 100%;
+}
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  border: 1px solid #c8d4cf;
+  border-radius: 5px;
+  padding: 0.75rem;
+  background: #fff;
+}
+.fabrication-section {
+  margin-top: 2.5rem;
+  min-width: 0;
+}
+.step-history {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+.step-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.step-heading h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.step-history h4 {
+  margin: 1.5rem 0 0.75rem;
+}
+.parameter-value {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.parameter-fields {
+  border: 1px solid #dce5de;
+  border-radius: 5px;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  min-width: 0;
+}
+.parameter-fields legend {
+  font-weight: 650;
+  padding-inline: 0.3rem;
+}
+.status-failure {
+  background: #fcf1eb;
+  color: #813d2b;
+  border-color: #e3c5b8;
+}
+.success-notice {
+  padding: 1rem;
+  background: #e8f0eb;
+  border-radius: 5px;
+}
+.cancel-step {
+  margin-top: 1rem;
+}
 .button {
   text-decoration: none;
 }
