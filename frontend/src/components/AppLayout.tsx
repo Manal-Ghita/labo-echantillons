@@ -21,6 +21,7 @@ export function AppLayout() {
         </Link>
         <nav aria-label="Navigation principale">
           <NavLink to="/samples">Échantillons</NavLink>
+          <NavLink to="/batches">Lots</NavLink>
           <NavLink to="/step-types">Catalogue</NavLink>
           {hasRole('ADMIN') && <NavLink to="/users">Comptes</NavLink>}
         </nav>

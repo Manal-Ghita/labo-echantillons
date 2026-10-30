@@ -8,5 +8,6 @@ import { FabricationStepsService } from './fabrication-steps.service';
   imports: [PrismaModule, AuthModule],
   controllers: [FabricationStepsController],
   providers: [FabricationStepsService],
+  exports: [FabricationStepsService],
 })
 export class FabricationStepsModule {}

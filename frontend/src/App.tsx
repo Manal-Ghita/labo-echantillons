@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { UsersPage } from './users/UsersPage'
+import { BatchesPage, BatchDetailPage } from './batches/BatchPages'
 import {
   CatalogueDetailPage,
   CataloguePage,
@@ -24,6 +25,8 @@ export function App() {
           <Route path="/samples" element={<SamplesPage />} />
           <Route path="/samples/new" element={<CreateSamplePage />} />
           <Route path="/samples/:id" element={<SampleDetailPage />} />
+          <Route path="/batches" element={<BatchesPage />} />
+          <Route path="/batches/:id" element={<BatchDetailPage />} />
           <Route path="/step-types" element={<CataloguePage />} />
           <Route element={<RequireAuth roles={['ADMIN']} />}>
             <Route path="/step-types/new" element={<CreateCataloguePage />} />

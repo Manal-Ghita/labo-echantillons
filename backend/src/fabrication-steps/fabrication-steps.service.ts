@@ -226,77 +226,7 @@ export class FabricationStepsService {
       throw new BadRequestException('Date de réalisation invalide.');
     try {
       return await this.prisma.$transaction(
-        async (tx) => {
-          const sample = await tx.sample.findUnique({
-            where: { id: sampleId },
-            select: { id: true, creatorId: true, status: true },
-          });
-          if (!sample) throw new NotFoundException('Échantillon introuvable.');
-          if (actor.role !== 'ADMIN' && sample.creatorId !== actor.id)
-            throw new ForbiddenException(
-              'Seul le propriétaire ou ADMIN peut enregistrer une étape.',
-            );
-          if (sample.status === 'ABANDONED')
-            throw new ConflictException(
-              'Un échantillon abandonné doit être réactivé avant toute nouvelle étape.',
-            );
-          const type = await tx.stepType.findUnique({
-            where: { id: dto.stepTypeId },
-            include: { parameters: true },
-          });
-          if (!type) throw new NotFoundException('Type d’étape introuvable.');
-          if (!type.isActive)
-            throw new ConflictException('Ce type d’étape est désactivé.');
-          if (dto.operatorId !== undefined) {
-            const operator = await tx.user.findUnique({
-              where: { id: dto.operatorId },
-              select: { id: true },
-            });
-            if (!operator) throw new BadRequestException('Opérateur inconnu.');
-          }
-          const definitions = new Map(
-            type.parameters.map((definition) => [definition.id, definition]),
-          );
-          const seen = new Set<string>();
-          const values = dto.parameterValues.map((parameter) => {
-            const definitionId = parameter.definitionId.toLowerCase();
-            if (seen.has(definitionId))
-              throw new BadRequestException(
-                'Un paramètre ne peut être fourni qu’une fois.',
-              );
-            seen.add(definitionId);
-            const definition = definitions.get(definitionId);
-            if (!definition)
-              throw new BadRequestException(
-                'Paramètre inconnu pour le type sélectionné.',
-              );
-            return parameterData(definition, parameter.value);
-          });
-          if (
-            type.parameters.some(
-              (definition) => definition.isRequired && !seen.has(definition.id),
-            )
-          ) {
-            throw new BadRequestException(
-              'Un paramètre obligatoire est absent.',
-            );
-          }
-          const created = await tx.fabricationStep.create({
-            data: {
-              sampleId,
-              stepTypeId: type.id,
-              operationName: type.name,
-              performedAt,
-              result: dto.result,
-              recordedById: actor.id,
-              operatorId: dto.operatorId,
-              observations: dto.observations,
-              parameterValues: { create: values },
-            },
-            include: historyInclude,
-          });
-          return serializeStep(created);
-        },
+        (tx) => this.createInTransaction(tx, sampleId, dto, actor),
         { isolationLevel: 'Serializable' },
       );
     } catch (error) {
@@ -310,6 +240,85 @@ export class FabricationStepsService {
       }
       throw error;
     }
+  }
+
+  // Shared by individual entry and atomic batch entry; never starts a nested transaction.
+  async createInTransaction(
+    tx: Prisma.TransactionClient,
+    sampleId: string,
+    dto: CreateFabricationStepDto,
+    actor: Pick<AuthenticatedUser, 'id' | 'role'>,
+  ) {
+    const performedAt = new Date(dto.performedAt);
+    if (Number.isNaN(performedAt.getTime()))
+      throw new BadRequestException('Date de réalisation invalide.');
+    const sample = await tx.sample.findUnique({
+      where: { id: sampleId },
+      select: { id: true, creatorId: true, status: true },
+    });
+    if (!sample) throw new NotFoundException('Échantillon introuvable.');
+    if (actor.role !== 'ADMIN' && sample.creatorId !== actor.id)
+      throw new ForbiddenException(
+        'Seul le propriétaire ou ADMIN peut enregistrer une étape.',
+      );
+    if (sample.status === 'ABANDONED')
+      throw new ConflictException(
+        'Un échantillon abandonné doit être réactivé avant toute nouvelle étape.',
+      );
+    const type = await tx.stepType.findUnique({
+      where: { id: dto.stepTypeId },
+      include: { parameters: true },
+    });
+    if (!type) throw new NotFoundException('Type d’étape introuvable.');
+    if (!type.isActive)
+      throw new ConflictException('Ce type d’étape est désactivé.');
+    if (dto.operatorId !== undefined) {
+      const operator = await tx.user.findUnique({
+        where: { id: dto.operatorId },
+        select: { id: true },
+      });
+      if (!operator) throw new BadRequestException('Opérateur inconnu.');
+    }
+    const definitions = new Map(
+      type.parameters.map((definition) => [definition.id, definition]),
+    );
+    const seen = new Set<string>();
+    const values = dto.parameterValues.map((parameter) => {
+      const definitionId = parameter.definitionId.toLowerCase();
+      if (seen.has(definitionId))
+        throw new BadRequestException(
+          'Un paramètre ne peut être fourni qu’une fois.',
+        );
+      seen.add(definitionId);
+      const definition = definitions.get(definitionId);
+      if (!definition)
+        throw new BadRequestException(
+          'Paramètre inconnu pour le type sélectionné.',
+        );
+      return parameterData(definition, parameter.value);
+    });
+    if (
+      type.parameters.some(
+        (definition) => definition.isRequired && !seen.has(definition.id),
+      )
+    ) {
+      throw new BadRequestException('Un paramètre obligatoire est absent.');
+    }
+    const created = await tx.fabricationStep.create({
+      data: {
+        sampleId,
+        stepTypeId: type.id,
+        operationName: type.name,
+        performedAt,
+        result: dto.result,
+        recordedById: actor.id,
+        operatorId: dto.operatorId,
+        observations: dto.observations,
+        parameterValues: { create: values },
+      },
+      include: historyInclude,
+    });
+    return serializeStep(created);
   }
 
   async findAll(sampleId: string) {

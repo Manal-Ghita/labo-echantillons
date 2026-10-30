@@ -1,0 +1,42 @@
+.batch-create,
+.batch-attach {
+  margin-block: 1.25rem;
+}
+.batch-create {
+  display: grid;
+  gap: 1rem;
+}
+.batch-table-region {
+  width: 100%;
+  overflow-x: auto;
+  margin-block: 1rem;
+}
+.batch-table-region table {
+  min-width: 540px;
+}
+.batch-table-region input[type='checkbox'],
+.batch-candidates input {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.batch-candidates {
+  display: grid;
+  gap: 0.75rem;
+  max-height: 18rem;
+  overflow-y: auto;
+  margin-block: 1rem;
+}
+.batch-candidates label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.batches-page .page-heading > .button {
+  white-space: normal;
+}
+.batches-page .batch-attach > .field {
+  max-width: 36rem;
+}
+#batch-step-panel .sample-form {
+  max-width: none;
+}

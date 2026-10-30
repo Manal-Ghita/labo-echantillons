@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { entryLabel, normalizedEntryValues } from './entry-format'
 import { ApiError, isAbortError } from '../api/client'
@@ -17,6 +18,9 @@ export function StepForm({
   actionsHost,
   onDirty,
   onBusy,
+  submitStep,
+  resultDetails,
+  submitLabel = 'Enregistrer l’étape',
 }: {
   sampleId: string
   sampleReference: string
@@ -26,6 +30,9 @@ export function StepForm({
   actionsHost?: HTMLElement | null
   onDirty?: () => void
   onBusy?: (busy: boolean) => void
+  submitStep?: (body: CreateStep, signal: AbortSignal) => Promise<unknown>
+  resultDetails?: ReactNode
+  submitLabel?: string
 }) {
   const { api, user } = useAuth()
   const load = useCallback(
@@ -95,19 +102,16 @@ export function StepForm({
     pending.current = controller
     setBusy(true)
     try {
-      await createStep(
-        api,
-        sampleId,
-        {
-          stepTypeId: type.id,
-          performedAt: new Date(performedAt).toISOString(),
-          result,
-          parameterValues: parameters,
-          ...(operatorId.trim() ? { operatorId: operatorId.trim() } : {}),
-          ...(observations ? { observations } : {}),
-        },
-        controller.signal,
-      )
+      const body: CreateStep = {
+        stepTypeId: type.id,
+        performedAt: new Date(performedAt).toISOString(),
+        result,
+        parameterValues: parameters,
+        ...(operatorId.trim() ? { operatorId: operatorId.trim() } : {}),
+        ...(observations ? { observations } : {}),
+      }
+      if (submitStep) await submitStep(body, controller.signal)
+      else await createStep(api, sampleId, body, controller.signal)
       if (!controller.signal.aborted) onCreated()
     } catch (caught) {
       if (!controller.signal.aborted && !isAbortError(caught)) {
@@ -132,7 +136,7 @@ export function StepForm({
         className="button button-primary"
         disabled={busy}
       >
-        {busy ? 'Enregistrement…' : 'Enregistrer l’étape'}
+        {busy ? 'Enregistrement…' : submitLabel}
       </button>
       <button
         type="button"
@@ -353,6 +357,7 @@ export function StepForm({
               </p>
             )}
           </fieldset>
+          {resultDetails}
           <div className="field">
             <label htmlFor="step-observations">Observations</label>
             <textarea
