@@ -151,9 +151,18 @@ describe('SamplesService (Prisma simulé)', () => {
   it('retourne un échantillon par identifiant', async () => {
     prisma.sample.findUnique.mockResolvedValue(sample);
     await expect(service.findOne(sample.id)).resolves.toEqual(sample);
-    expect(prisma.sample.findUnique).toHaveBeenCalledWith({
-      where: { id: sample.id },
-    });
+    expect(prisma.sample.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: sample.id },
+        include: expect.objectContaining({
+          parent: { select: { id: true, reference: true, name: true } },
+          children: expect.any(Object),
+          originStep: {
+            select: { id: true, operationName: true, performedAt: true },
+          },
+        }),
+      }),
+    );
   });
 
   it('signale un échantillon inexistant', async () => {

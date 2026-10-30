@@ -13,6 +13,7 @@ import { useSampleQuery } from './useSampleQuery'
 import { SampleSteps } from '../fabrication/SampleSteps'
 import { NumericSearch } from './NumericSearch'
 import { StatusControl } from './StatusControl'
+import { SampleLineage } from './SampleLineage'
 import type { Sample } from './api'
 import './entry-forms.css'
 
@@ -280,6 +281,14 @@ export function SampleDetailPage() {
               </div>
             </dl>
           </div>
+          <SampleLineage
+            key={`lineage:${sample.id}`}
+            sample={sample}
+            onCreated={() => {
+              setUpdated(null)
+              result.retry()
+            }}
+          />
           <SampleSteps
             key={`steps:${sample.id}:${sample.status}`}
             sample={sample}
@@ -288,7 +297,7 @@ export function SampleDetailPage() {
           <StatusControl
             key={`status:${sample.id}:${sample.status}`}
             sample={sample}
-            onUpdated={setUpdated}
+            onUpdated={(updated) => setUpdated({ ...sample, ...updated })}
           />
         </>
       )}

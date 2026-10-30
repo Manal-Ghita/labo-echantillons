@@ -12,6 +12,14 @@ export type Sample = {
   batchId: string | null
   parentId: string | null
   originStepId: string | null
+  parent?: { id: string; reference: string; name: string } | null
+  children?: {
+    id: string
+    reference: string
+    name: string
+    status: Sample['status']
+  }[]
+  originStep?: { id: string; operationName: string; performedAt: string } | null
 }
 
 export type CreateSample = {

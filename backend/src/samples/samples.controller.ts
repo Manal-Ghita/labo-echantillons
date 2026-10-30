@@ -19,6 +19,7 @@ import { CreateSampleDto } from './dto/create-sample.dto';
 import { ListSamplesDto } from './dto/list-samples.dto';
 import { SamplesService } from './samples.service';
 import { UpdateSampleStatusDto } from './dto/update-sample-status.dto';
+import { SplitSampleDto } from './dto/split-sample.dto';
 
 @Controller('samples')
 @UseGuards(JwtAuthGuard)
@@ -61,5 +62,16 @@ export class SamplesController {
     @Req() request: AuthenticatedRequest,
   ) {
     return this.samples.updateStatus(id, dto.status, request.user);
+  }
+
+  @Post(':id/split')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'RESEARCHER')
+  split(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: SplitSampleDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.samples.split(id, dto, request.user);
   }
 }

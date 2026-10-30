@@ -1,0 +1,35 @@
+.lineage-children {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.lineage-children li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding-block: 0.5rem;
+}
+.split-child {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+}
+.split-child legend {
+  font-weight: 650;
+}
+.split-child > .button {
+  justify-self: start;
+}
+#split-form > .field {
+  margin-block: 1rem;
+}
+.sample-lineage .page-heading {
+  gap: 1rem;
+}
