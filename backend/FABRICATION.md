@@ -1,76 +1,86 @@
-# Enregistrement et historique de fabrication
+# Gestion des étapes de fabrication
 
-Les routes `POST /samples/:sampleId/steps` et `GET /samples/:sampleId/steps`
-exigent `Authorization: Bearer <token>`. Aucun identifiant d'auteur n'est accepté
-dans le corps : l'identité vérifiée par le guard JWT est utilisée.
+Ce document décrit l'enregistrement des opérations réalisées sur les échantillons, leur consultation et les règles de validation.
 
-## Création
+## Enregistrement d'une étape
 
-Champs du corps :
+Chaque échantillon possède un historique de fabrication. Une étape correspond à une opération réalisée à une date donnée, avec ses paramètres et son résultat.
 
-- `stepTypeId` : UUID d'un type actif du catalogue.
-- `performedAt` : date ISO 8601 complète avec fuseau (`Z` ou décalage), précision
-  maximale de trois décimales pour les secondes, conformément au stockage existant.
-- `result` : `SUCCESS` ou `FAILURE`.
-- `operatorId` facultatif : UUID d'un compte existant, distinct ou non de l'auteur.
-- `observations` facultatives : texte.
-- `parameterValues` : tableau (éventuellement vide si aucun paramètre obligatoire)
-  de couples `{ definitionId, value }`.
+La création se fait avec la route :
 
-Le sélecteur d'opérateur charge une fois `GET /users/operators` à l'ouverture du
-formulaire et recherche les noms côté navigateur. « Moi » désigne l'identifiant
-du profil authentifié ; l'opérateur reste facultatif et peut être une autre
-personne. L'auteur de saisie provient toujours du JWT, et le propriétaire reste
-`creatorId`. Une liste indisponible ou vide est signalée et permet d'enregistrer
-sans opérateur ; aucun identifiant n'est inventé. Le POST conserve `operatorId`.
+`POST /samples/:sampleId/steps`
 
-Les définitions doivent appartenir au type sélectionné, sans doublon.
-Chaque définition obligatoire doit posséder une valeur. La valeur est :
+Les informations attendues sont :
 
-- NUMBER : chaîne décimale, par exemple `"120.1234567890123456789"`, sans exposant
-  ni espaces ; les nombres JSON sont refusés pour éviter une perte préalable de précision.
-  Le stockage est `DECIMAL(65,30)` ; les valeurs nécessitant plus de 35 chiffres
-  entiers ou plus de 30 décimales non supprimables sans perte sont refusées.
-- TEXT : chaîne, y compris vide.
-- BOOLEAN : vrai booléen JSON (`true`/`false`), sans conversion de chaînes.
+| Champ | Description |
+|---|---|
+| `stepTypeId` | Identifiant d'un type d'opération actif |
+| `performedAt` | Date et heure de réalisation au format ISO 8601 avec fuseau |
+| `result` | `SUCCESS` ou `FAILURE` |
+| `operatorId` | Identifiant facultatif de la personne ayant réalisé l'opération |
+| `observations` | Commentaires facultatifs |
+| `parameterValues` | Valeurs des paramètres définis pour cette opération |
 
-Zéro et false sont des valeurs présentes. NULL n'est pas une valeur fournie.
-Les unités viennent des définitions du catalogue ; aucune unité ou conversion
-libre n'est acceptée dans les valeurs. Les UUID de définitions sont comparés sans
-distinction de casse, comme PostgreSQL.
+L'auteur de la saisie est identifié automatiquement grâce au JWT. Il n'est donc pas nécessaire de transmettre son identifiant.
 
-Seul le propriétaire (`creatorId`) ou ADMIN peut créer une étape. Le statut
-ABANDONED bloque la création pour les deux rôles ; le propriétaire ou ADMIN peut
-réactiver explicitement l'échantillon via `PATCH /samples/:id/status`. Un ancien statut NULL n'est pas modifié et
-ne bloque pas l'enregistrement.
+L'opérateur peut être différent de l'auteur. Le formulaire permet de choisir un utilisateur existant à partir de la liste fournie par `GET /users/operators`. Ce champ reste facultatif.
 
-La lecture des règles et la création sont effectuées dans une transaction Prisma
-sérialisable, avec une seule création imbriquée de l'étape et de toutes ses valeurs.
-Le libellé d'opération est copié depuis le catalogue et `recordedAt` vient de la base.
-Les étapes répétées, réussies ou échouées restent des occurrences indépendantes.
-Un conflit concurrent retourne 409 sans nouvelle tentative automatique.
+## Gestion des paramètres
 
-## Consultation et compatibilité
+Les paramètres dépendent du type d'opération sélectionné dans le catalogue. Trois types de valeurs sont possibles :
 
-Tout utilisateur authentifié peut consulter l'historique de tout échantillon,
-y compris abandonné. L'ordre est `performedAt`, puis `recordedAt`, puis `id`, croissants.
-L'historique inclut les définitions, unités et identités publiques (id et nom)
-de l'auteur et de l'opérateur, sans hash ni secret.
-Les valeurs numériques sont retournées sous forme de chaînes décimales exactes.
+- **NUMBER :** valeur décimale transmise sous forme de chaîne, par exemple `"150.25"`.
+- **TEXT :** valeur textuelle, éventuellement vide.
+- **BOOLEAN :** `true` ou `false`.
 
-Le champ historique `parameters` reste restitué sans conversion. Les anciennes
-étapes peuvent garder type, résultat et opérateur NULL et une liste de valeurs vide.
-Le POST n'accepte pas ce champ historique et ne modifie aucune ancienne étape.
+Les paramètres obligatoires doivent être renseignés et chaque définition ne peut apparaître qu'une fois.
 
-Réponses : 201 pour une création ; 200 pour une lecture ; 400 pour une saisie
-invalide ou un opérateur inconnu ; 401 sans JWT valide ; 403 pour un autre chercheur ;
-404 pour un échantillon/type absent ; 409 pour un échantillon abandonné, un type
-désactivé ou un conflit transactionnel.
+Les valeurs numériques sont conservées avec une précision décimale adaptée au stockage `DECIMAL(65,30)`. Les nombres JSON et les notations exponentielles ne sont pas acceptés pour éviter les pertes de précision.
 
-Les tests ordinaires et e2e utilisent Prisma simulé. L'intégration réelle se lance
-séparément, après autorisation, avec `npm run test:fabrication:postgres`, exclusivement
-sur `labo_echantillons_test`. Les 22 scénarios, dont une erreur SQL forcée et son
-rollback, ont été vérifiés ; détails dans [test/FABRICATION-STEPS-TEST.md](test/FABRICATION-STEPS-TEST.md).
+Les unités sont définies dans le catalogue et ne sont pas saisies librement.
 
-Les corrections motivées, leurs révisions, la recherche numérique et les changements
-d'état sont détaillés dans [SEARCH-AND-CORRECTIONS.md](SEARCH-AND-CORRECTIONS.md).
+## Autorisations et validation
+
+Seul le propriétaire de l'échantillon ou un administrateur peut ajouter une étape.
+
+Il n'est pas possible d'ajouter une nouvelle opération à un échantillon abandonné. Celui-ci doit d'abord être réactivé.
+
+Le backend vérifie également que le type d'opération est actif, que les paramètres correspondent à ses définitions et que les utilisateurs indiqués existent.
+
+L'enregistrement est réalisé dans une transaction Prisma. Cela permet d'éviter qu'une étape soit enregistrée partiellement. En cas de conflit concurrent, l'API renvoie une erreur `409`.
+
+## Consultation de l'historique
+
+L'historique est accessible à tous les utilisateurs authentifiés avec :
+
+`GET /samples/:sampleId/steps`
+
+Les étapes sont affichées dans l'ordre chronologique, selon leur date de réalisation, leur date d'enregistrement puis leur identifiant.
+
+Chaque étape conserve son type d'opération, ses paramètres, son résultat, ainsi que les informations publiques de l'auteur et de l'opérateur.
+
+Une même opération peut être répétée plusieurs fois. Les opérations échouées sont également conservées.
+
+Les anciennes données restent accessibles, même lorsqu'elles ne possèdent pas tous les champs utilisés dans la version actuelle.
+
+## Corrections
+
+Une étape déjà enregistrée peut être corrigée par les utilisateurs autorisés.
+
+La correction nécessite un motif et conserve l'ancienne version dans un historique de révisions. Cela permet de retrouver les modifications sans perdre les données initiales.
+
+Les règles détaillées concernant les corrections, la recherche numérique et le changement de statut des échantillons sont présentées dans [SEARCH-AND-CORRECTIONS.md](SEARCH-AND-CORRECTIONS.md).
+
+## Tests
+
+Les tests ordinaires utilisent des dépendances simulées.
+
+Les tests avec PostgreSQL sont lancés séparément :
+
+```bash
+npm run test:fabrication:postgres
+```
+
+Ils nécessitent une base de test dédiée, `labo_echantillons_test`, déjà configurée et migrée. Ils ne doivent pas être exécutés sur la base principale.
+
+Les scénarios détaillés sont disponibles dans [test/FABRICATION-STEPS-TEST.md](test/FABRICATION-STEPS-TEST.md).
