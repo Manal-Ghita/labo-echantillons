@@ -53,7 +53,7 @@ const profile = {
   id: owner,
   name: 'Camille',
   email: 'camille@example.test',
-  role: 'RESEARCHER',
+  role: 'RESEARCHER', isActive: true,
   createdAt: '2026-10-29T08:00:00Z',
 }
 const sample = {
@@ -111,11 +111,16 @@ async function openForm() {
 async function fillForm(result = 'SUCCESS') {
   const user = userEvent.setup()
   await user.selectOptions(screen.getByLabelText('Type d’opération *'), typeId)
+  await user.clear(screen.getByLabelText('Date de réalisation *'))
   await user.type(
     screen.getByLabelText('Date de réalisation *'),
     '2026-10-29T10:30:00',
   )
-  await user.selectOptions(screen.getByLabelText('Résultat *'), result)
+  await user.click(
+    screen.getByRole('radio', {
+      name: result === 'SUCCESS' ? 'Réussie' : 'Échouée',
+    }),
+  )
   await user.click(screen.getByLabelText('Température (°C) *'))
   await user.paste(precise)
   await user.type(screen.getByLabelText('Gaz'), 'Argon')
@@ -178,6 +183,11 @@ beforeEach(() => {
   fetcher = vi.fn(async (url: string, options: RequestInit) => {
     if (url.endsWith('/auth/me'))
       return Response.json({ ...profile, id: actor, role })
+    if (url.endsWith('/users/operators'))
+      return Response.json([
+        { id: actor, name: profile.name },
+        { id: '8b717a1a-629e-4871-935b-7f4d60976772', name: 'Alex' },
+      ])
     if (url.endsWith('/step-types'))
       return catalogueResponse ? catalogueResponse() : Response.json(types)
     if (url.endsWith('/steps'))
@@ -195,6 +205,87 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Historique et enregistrement de fabrication', () => {
+  it('propose ADMIN comme opérateur courant sans le confondre avec le propriétaire ni envoyer un auteur client', async () => {
+    role = 'ADMIN'
+    actor = '3e1bf8ea-13a3-4595-a8da-1607250cdcbd'
+    await openForm()
+    const user = await fillForm('SUCCESS')
+    expect(screen.getByLabelText('Opérateur réel')).toHaveValue(actor)
+    expect(actor).not.toBe(sample.creatorId)
+    await user.click(
+      screen.getByRole('button', { name: 'Enregistrer l’étape' }),
+    )
+    await screen.findByText('Étape enregistrée.')
+    const body = post.mock.calls[0][0] as Record<string, unknown>
+    expect(body.operatorId).toBe(actor)
+    expect(body).not.toHaveProperty('recordedById')
+    expect(body).not.toHaveProperty('creatorId')
+  })
+  it('préremplit la date locale à l’ouverture et affiche le contexte réel', async () => {
+    const before = Date.now()
+    await openForm()
+    const date = screen.getByLabelText(
+      'Date de réalisation *',
+    ) as HTMLInputElement
+    const localInstant = new Date(date.value).getTime()
+    expect(localInstant).toBeGreaterThanOrEqual(before - 1000)
+    expect(localInstant).toBeLessThanOrEqual(Date.now())
+    expect(screen.getByText('K24-017 · Silicium')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'Enregistrer l’étape' }),
+    ).toBeEnabled()
+    expect(screen.getByRole('radio', { name: 'Réussie' })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Échouée' })).not.toBeChecked()
+  })
+  it('affiche les erreurs sous les champs sans appel API, puis conserve les validations exactes des paramètres', async () => {
+    await openForm()
+    const user = userEvent.setup()
+    await user.click(
+      screen.getByRole('button', { name: 'Enregistrer l’étape' }),
+    )
+    expect(screen.getByLabelText('Type d’opération *')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(
+      screen.getByLabelText('Type d’opération *'),
+    ).toHaveAccessibleDescription('Choisissez un type d’opération.')
+    expect(
+      screen.getByRole('group', { name: 'Résultat *' }),
+    ).toHaveAccessibleDescription('Choisissez un résultat.')
+    expect(post).not.toHaveBeenCalled()
+    await user.selectOptions(
+      screen.getByLabelText('Type d’opération *'),
+      typeId,
+    )
+    await user.click(screen.getByRole('radio', { name: 'Échouée' }))
+    await user.clear(screen.getByLabelText('Date de réalisation *'))
+    await user.type(screen.getByLabelText('Température (°C) *'), '1,2,5')
+    await user.type(
+      screen.getByLabelText('Rechercher un opérateur par nom'),
+      'not-a-person',
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Enregistrer l’étape' }),
+    )
+    expect(screen.getByLabelText('Date de réalisation *')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(screen.getByLabelText('Température (°C) *')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(screen.getByLabelText('Sous vide *')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    expect(screen.getByLabelText('Opérateur réel')).toHaveValue(actor)
+    expect(post).not.toHaveBeenCalled()
+    expect(fetcher.mock.calls.some(([url]) => url.endsWith('/users'))).toBe(
+      false,
+    )
+  })
   it.each(['Température (°C) *', 'Sous vide *'])(
     'bloque un paramètre obligatoire absent : %s',
     async (label) => {
@@ -280,11 +371,16 @@ describe('Historique et enregistrement de fabrication', () => {
     const items = screen.getByRole('list').querySelectorAll('li')
     expect(items[0]).toHaveTextContent('Ancienne opération')
     expect(items[1]).toHaveTextContent('Dépôt répété')
-    expect(screen.getAllByText('Puissance = 120 W')).toHaveLength(2)
-    expect(screen.getByText(precise)).toBeVisible()
+    await userEvent.click(
+      screen.getAllByRole('button', {
+        name: /Afficher les détails de l’étape/,
+      })[1],
+    )
+    expect(screen.getAllByText('Puissance = 120 W')).toHaveLength(3)
+    expect(screen.getByText(precise.replace('.', ',') + ' °C')).toBeVisible()
     expect(screen.getByText('Non', { exact: true })).toBeVisible()
     expect(screen.getByText('Alex')).toBeVisible()
-    expect(screen.getByText('Échouée (FAILURE)')).toBeVisible()
+    expect(screen.getByText('Échouée')).toBeVisible()
     expect(
       screen.queryByRole('button', { name: 'Enregistrer une étape' }),
     ).not.toBeInTheDocument()
@@ -321,10 +417,7 @@ describe('Historique et enregistrement de fabrication', () => {
         screen.getByLabelText('Observations'),
         'Essai de fabrication',
       )
-      await user.type(
-        screen.getByLabelText('Opérateur réel (UUID, facultatif)'),
-        owner,
-      )
+      await user.selectOptions(screen.getByLabelText('Opérateur réel'), owner)
       await user.click(
         screen.getByRole('button', { name: 'Enregistrer l’étape' }),
       )
@@ -332,7 +425,12 @@ describe('Historique et enregistrement de fabrication', () => {
       expect(
         await screen.findByRole('heading', { name: 'Dépôt' }),
       ).toBeVisible()
-      expect(screen.getByText(precise)).toBeVisible()
+      await userEvent.click(
+        screen
+          .getAllByRole('button', { name: /Afficher les détails de l’étape/ })
+          .at(-1)!,
+      )
+      expect(screen.getByText(precise.replace('.', ',') + ' °C')).toBeVisible()
       expect(screen.getByText('Argon')).toBeVisible()
       expect(
         screen.getByText('Opérateur réel', { selector: 'dd' }),
@@ -387,7 +485,7 @@ describe('Historique et enregistrement de fabrication', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('sans exposant')
     expect(post).not.toHaveBeenCalled()
   })
-  it('vide les paramètres lors d’un changement de type', async () => {
+  it('conserve les paramètres au retour au type initial', async () => {
     types = [
       type,
       { ...type, id: 'other-type', name: 'Nettoyage', parameters: [] },
@@ -405,7 +503,7 @@ describe('Historique et enregistrement de fabrication', () => {
       screen.getByLabelText('Type d’opération *'),
       typeId,
     )
-    expect(screen.getByLabelText('Température (°C) *')).toHaveValue('')
+    expect(screen.getByLabelText('Température (°C) *')).toHaveValue(precise)
   })
   it('ne propose aucun type inactif et gère un catalogue vide', async () => {
     types = [{ ...type, isActive: false }]
@@ -484,6 +582,38 @@ describe('Historique et enregistrement de fabrication', () => {
       screen.getByRole('button', { name: 'Réessayer le catalogue' }),
     )
     expect(await screen.findByLabelText('Type d’opération *')).toBeVisible()
+  })
+  it('normalise la virgule sans perte de précision avant le POST', async () => {
+    await openForm()
+    const user = await fillForm()
+    await user.clear(screen.getByLabelText('Température (°C) *'))
+    await user.click(screen.getByLabelText('Température (°C) *'))
+    await user.paste(precise.replace('.', ','))
+    await user.click(
+      screen.getByRole('button', { name: 'Enregistrer l’étape' }),
+    )
+    await waitFor(() => expect(post).toHaveBeenCalled())
+    expect(post.mock.calls[0][0]).toMatchObject({
+      parameterValues: expect.arrayContaining([
+        { definitionId: numericId, value: precise },
+      ]),
+    })
+  })
+  it('demande confirmation avant de perdre une saisie et conserve les champs si refus', async () => {
+    await openForm()
+    const user = await fillForm()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    await user.click(screen.getByRole('button', { name: 'Annuler la saisie' }))
+    expect(confirm).toHaveBeenCalledOnce()
+    expect(screen.getByLabelText('Température (°C) *')).toHaveValue(precise)
+    confirm.mockReturnValue(true)
+    await user.click(screen.getByRole('button', { name: 'Fermer le panneau' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Enregistrer une étape' }),
+    ).toHaveFocus()
+    expect(post).not.toHaveBeenCalled()
+    confirm.mockRestore()
   })
   it('annule une saisie sans appel POST', async () => {
     await openForm()

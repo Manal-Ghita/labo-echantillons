@@ -1,6 +1,6 @@
 .step-corrections {
   margin-top: 1.5rem;
-  border-top: 1px solid #dce5de;
+  border-top: 1px solid var(--color-border);
   padding-top: 1rem;
 }
 .step-corrections details {

@@ -6,6 +6,7 @@ import { useSampleQuery } from '../samples/useSampleQuery'
 import { parameterValues } from './api'
 import type { FabricationStep, StepType } from './api'
 import './corrections.css'
+import { numericDisplay, resultDisplay } from './display'
 
 type Snapshot = Partial<
   Pick<
@@ -34,8 +35,8 @@ function SnapshotView({ value }: { value: Snapshot }) {
         Réalisation :{' '}
         {value.performedAt ? formatDate(value.performedAt) : 'Non renseignée'}
       </p>
-      <p>Résultat : {value.result ?? 'Non renseigné'}</p>
-      <p>Opérateur : {value.operator?.name ?? 'Non renseigné'}</p>
+      <p>Résultat : {resultDisplay(value.result)}</p>
+      {value.operator && <p>Opérateur : {value.operator.name}</p>}
       <p className="sample-description">
         Observations : {value.observations ?? 'Aucune'}
       </p>
@@ -54,7 +55,12 @@ function SnapshotView({ value }: { value: Snapshot }) {
                 : ''}
             </dt>
             <dd className="parameter-value">
-              {parameter.numericValue ??
+              {(parameter.numericValue !== null
+                ? numericDisplay(
+                    parameter.numericValue,
+                    parameter.definition.unit,
+                  )
+                : null) ??
                 parameter.textValue ??
                 (parameter.booleanValue === null
                   ? 'Non renseigné'
@@ -266,8 +272,8 @@ function CorrectionForm({
           onChange={(event) => setResult(event.target.value as typeof result)}
         >
           {step.result === null && <option value="">Non renseigné</option>}
-          <option value="SUCCESS">Réussie (SUCCESS)</option>
-          <option value="FAILURE">Échouée (FAILURE)</option>
+          <option value="SUCCESS">Réussie</option>
+          <option value="FAILURE">Échouée</option>
         </select>
       </div>
       <fieldset className="parameter-fields" disabled={busy}>
@@ -379,6 +385,13 @@ export function StepCorrections({
 }) {
   const [editing, setEditing] = useState(false)
   const [history, setHistory] = useState(false)
+  // Each committed correction increments revision and creates one audit record atomically.
+  const corrections =
+    typeof step.revision === 'number' &&
+    Number.isSafeInteger(step.revision) &&
+    step.revision > 0
+      ? step.revision
+      : 0
   const url = `/samples/${encodeURIComponent(sampleId)}/steps/${encodeURIComponent(step.id)}/corrections`
   return (
     <div className="step-corrections">
@@ -391,13 +404,16 @@ export function StepCorrections({
             Corriger l’étape
           </button>
         )}
-        <button
-          className="button button-secondary"
-          onClick={() => setHistory((value) => !value)}
-          aria-expanded={history}
-        >
-          {history ? 'Masquer les corrections' : 'Afficher les corrections'}
-        </button>
+        {corrections > 0 && (
+          <button
+            className="button button-secondary"
+            onClick={() => setHistory((value) => !value)}
+            aria-expanded={history}
+          >
+            {history ? 'Masquer les corrections' : 'Afficher les corrections'} (
+            {corrections} {corrections === 1 ? 'correction' : 'corrections'})
+          </button>
+        )}
       </div>
       {editing && authorized && (
         <CorrectionForm

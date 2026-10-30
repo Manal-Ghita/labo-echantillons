@@ -1,20 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { entryLabel, normalizedEntryValues } from './entry-format'
 import { ApiError, isAbortError } from '../api/client'
 import { useAuth } from '../auth/context'
 import { useSampleQuery } from '../samples/useSampleQuery'
 import { createStep, getStepTypes, parameterValues } from './api'
 import type { CreateStep } from './api'
+import { OperatorSelect } from './OperatorSelect'
 
 export function StepForm({
   sampleId,
+  sampleReference,
+  sampleName,
   onCreated,
   onCancel,
+  actionsHost,
+  onDirty,
+  onBusy,
 }: {
   sampleId: string
+  sampleReference: string
+  sampleName: string
   onCreated: () => void
   onCancel: () => void
+  actionsHost?: HTMLElement | null
+  onDirty?: () => void
+  onBusy?: (busy: boolean) => void
 }) {
-  const { api } = useAuth()
+  const { api, user } = useAuth()
   const load = useCallback(
     (signal: AbortSignal) => getStepTypes(api, signal),
     [api],
@@ -22,15 +35,31 @@ export function StepForm({
   const catalogue = useSampleQuery(load)
   const [typeId, setTypeId] = useState('')
   const [values, setValues] = useState<Record<string, string>>({})
-  const [performedAt, setPerformedAt] = useState('')
+  const [performedAt, setPerformedAt] = useState(() => {
+    const now = new Date()
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 19)
+  })
   const [result, setResult] = useState<CreateStep['result'] | ''>('')
-  const [operatorId, setOperatorId] = useState('')
+  const [operatorId, setOperatorId] = useState(user?.id ?? '')
   const [observations, setObservations] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [details, setDetails] = useState<string[]>([])
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
+  useEffect(() => onBusy?.(busy), [busy, onBusy])
   const pending = useRef<AbortController | null>(null)
   useEffect(() => () => pending.current?.abort(), [])
+  useEffect(() => {
+    if (!error) return
+    const form = document.getElementById('new-step-form')
+    const target = form?.querySelector<HTMLElement>(
+      '[aria-invalid="true"]:not(fieldset), [role="alert"]',
+    )
+    target?.focus()
+    target?.scrollIntoView?.({ block: 'nearest' })
+  }, [error, fieldErrors])
   const types = catalogue.data?.filter((type) => type.isActive)
   const type = types?.find((item) => item.id === typeId)
 
@@ -38,24 +67,30 @@ export function StepForm({
     if (pending.current) return
     setError(null)
     setDetails([])
-    if (
-      !type ||
-      !result ||
-      !performedAt ||
-      !Number.isFinite(new Date(performedAt).getTime())
-    ) {
+    const normalized = type ? normalizedEntryValues(type, values) : values
+    const invalid: Record<string, string> = {}
+    if (!type) invalid.type = 'Choisissez un type d’opération.'
+    if (!result) invalid.result = 'Choisissez un résultat.'
+    if (!performedAt || !Number.isFinite(new Date(performedAt).getTime()))
+      invalid.date = 'Indiquez une date de réalisation valide.'
+    if (type) {
+      for (const definition of type.parameters) {
+        try {
+          parameterValues({ ...type, parameters: [definition] }, normalized)
+        } catch (caught) {
+          invalid[definition.id] = (caught as Error).message
+        }
+      }
+    }
+    setFieldErrors(invalid)
+    if (Object.keys(invalid).length || !type || !result) {
       setError(
-        'Le type, la date de réalisation et le résultat sont obligatoires.',
+        Object.values(invalid)[0] ??
+          'Veuillez vérifier les champs du formulaire.',
       )
       return
     }
-    let parameters: CreateStep['parameterValues']
-    try {
-      parameters = parameterValues(type, values)
-    } catch (caught) {
-      setError((caught as Error).message)
-      return
-    }
+    const parameters = parameterValues(type, normalized)
     const controller = new AbortController()
     pending.current = controller
     setBusy(true)
@@ -89,9 +124,35 @@ export function StepForm({
     }
   }
 
+  const actions = (
+    <div className="entry-actions">
+      <button
+        type="submit"
+        form="new-step-form"
+        className="button button-primary"
+        disabled={busy}
+      >
+        {busy ? 'Enregistrement…' : 'Enregistrer l’étape'}
+      </button>
+      <button
+        type="button"
+        className="button button-secondary"
+        onClick={onCancel}
+        disabled={busy}
+      >
+        Annuler la saisie
+      </button>
+    </div>
+  )
+
   return (
-    <section className="fabrication-section" aria-labelledby="step-form-title">
-      <h2 id="step-form-title">Nouvelle étape de fabrication</h2>
+    <section
+      className="fabrication-section step-entry"
+      aria-labelledby="step-form-title"
+    >
+      <p className="muted step-entry-context">
+        {sampleReference} · {sampleName}
+      </p>
       {catalogue.loading && (
         <p role="status">Chargement des types d’opérations…</p>
       )}
@@ -112,19 +173,18 @@ export function StepForm({
       )}
       {types && types.length > 0 && (
         <form
+          id="new-step-form"
+          onChangeCapture={onDirty}
           className="sample-panel sample-form"
           aria-busy={busy}
+          noValidate
           onSubmit={(event) => {
             event.preventDefault()
             void submit()
           }}
         >
-          <p>
-            Les champs marqués * sont obligatoires. La date est saisie dans
-            votre heure locale.
-          </p>
           {error && (
-            <div role="alert" className="alert">
+            <div role="alert" tabIndex={-1} className="alert">
               <p>{error}</p>
               {details.length > 0 && (
                 <ul>
@@ -142,49 +202,28 @@ export function StepForm({
               value={typeId}
               required
               disabled={busy}
+              aria-invalid={!!fieldErrors.type}
+              aria-describedby={fieldErrors.type ? 'type-error' : undefined}
               onChange={(event) => {
                 setTypeId(event.target.value)
-                setValues({})
                 setError(null)
                 setDetails([])
+                setFieldErrors({})
               }}
             >
               <option value="">Choisir un type</option>
               {types.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.code} — {item.name}
+                  {item.name}
                 </option>
               ))}
             </select>
             {type?.description && <p className="muted">{type.description}</p>}
-          </div>
-          <div className="field">
-            <label htmlFor="performed-at">Date de réalisation *</label>
-            <input
-              id="performed-at"
-              type="datetime-local"
-              step="1"
-              required
-              value={performedAt}
-              disabled={busy}
-              onChange={(event) => setPerformedAt(event.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="step-result">Résultat *</label>
-            <select
-              id="step-result"
-              required
-              value={result}
-              disabled={busy}
-              onChange={(event) =>
-                setResult(event.target.value as typeof result)
-              }
-            >
-              <option value="">Choisir un résultat</option>
-              <option value="SUCCESS">Réussie (SUCCESS)</option>
-              <option value="FAILURE">Échouée (FAILURE)</option>
-            </select>
+            {fieldErrors.type && (
+              <p className="entry-field-error" id="type-error">
+                {fieldErrors.type}
+              </p>
+            )}
           </div>
           {type && (
             <fieldset disabled={busy} className="parameter-fields">
@@ -194,14 +233,21 @@ export function StepForm({
               )}
               {type.parameters.map((definition) => {
                 const id = `parameter-${definition.id}`
-                const label = `${definition.name}${definition.unit ? ` (${definition.unit})` : ''}${definition.isRequired ? ' *' : ''}`
+                const label = entryLabel(definition)
                 return (
-                  <div className="field" key={definition.id}>
+                  <div
+                    className={`field ${definition.dataType === 'TEXT' ? 'parameter-long' : ''}`}
+                    key={definition.id}
+                  >
                     <label htmlFor={id}>{label}</label>
                     {definition.dataType === 'BOOLEAN' ? (
                       <select
                         id={id}
                         required={definition.isRequired}
+                        aria-invalid={!!fieldErrors[definition.id]}
+                        aria-describedby={
+                          fieldErrors[definition.id] ? `${id}-error` : undefined
+                        }
                         value={values[definition.id] ?? ''}
                         onChange={(event) =>
                           setValues((current) => ({
@@ -215,33 +261,54 @@ export function StepForm({
                         <option value="false">Non</option>
                       </select>
                     ) : (
-                      <input
-                        id={id}
-                        type="text"
-                        inputMode={
-                          definition.dataType === 'NUMBER' ? 'decimal' : 'text'
-                        }
-                        required={
-                          definition.isRequired &&
-                          definition.dataType !== 'TEXT'
-                        }
-                        value={values[definition.id] ?? ''}
-                        onChange={(event) =>
-                          setValues((current) => ({
-                            ...current,
-                            [definition.id]: event.target.value,
-                          }))
-                        }
-                        aria-describedby={
-                          definition.dataType === 'NUMBER'
-                            ? `${id}-help`
-                            : undefined
-                        }
-                      />
+                      <div className="entry-unit-field">
+                        <input
+                          id={id}
+                          type="text"
+                          inputMode={
+                            definition.dataType === 'NUMBER'
+                              ? 'decimal'
+                              : 'text'
+                          }
+                          required={
+                            definition.isRequired &&
+                            definition.dataType !== 'TEXT'
+                          }
+                          aria-invalid={!!fieldErrors[definition.id]}
+                          value={values[definition.id] ?? ''}
+                          onChange={(event) =>
+                            setValues((current) => ({
+                              ...current,
+                              [definition.id]: event.target.value,
+                            }))
+                          }
+                          aria-describedby={
+                            [
+                              definition.dataType === 'NUMBER'
+                                ? `${id}-help`
+                                : '',
+                              fieldErrors[definition.id] ? `${id}-error` : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' ') || undefined
+                          }
+                        />
+                        {definition.unit && (
+                          <span aria-hidden="true" className="entry-unit">
+                            {definition.unit}
+                          </span>
+                        )}
+                      </div>
                     )}
                     {definition.dataType === 'NUMBER' && (
                       <p className="muted" id={`${id}-help`}>
-                        Décimal avec un point, sans exposant. Exemple : 0.125
+                        Décimal avec une virgule ou un point, sans exposant.
+                        Exemple : 0,125
+                      </p>
+                    )}
+                    {fieldErrors[definition.id] && (
+                      <p className="entry-field-error" id={`${id}-error`}>
+                        {fieldErrors[definition.id]}
                       </p>
                     )}
                   </div>
@@ -249,51 +316,92 @@ export function StepForm({
               })}
             </fieldset>
           )}
-          <div className="field">
-            <label htmlFor="step-operator">
-              Opérateur réel (UUID, facultatif)
-            </label>
-            <input
-              id="step-operator"
-              value={operatorId}
-              disabled={busy}
-              pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
-              onChange={(event) => setOperatorId(event.target.value)}
-              aria-describedby="operator-help"
-            />
-            <p id="operator-help" className="muted">
-              Identifiant d’un utilisateur existant. L’auteur de saisie est
-              automatiquement votre compte connecté.
-            </p>
-          </div>
+          <fieldset
+            className="step-result-options"
+            disabled={busy}
+            aria-describedby={fieldErrors.result ? 'result-error' : undefined}
+            aria-invalid={!!fieldErrors.result}
+          >
+            <legend>Résultat *</legend>
+            <div className="step-result-choices">
+              <label>
+                <input
+                  type="radio"
+                  name="step-result"
+                  value="SUCCESS"
+                  checked={result === 'SUCCESS'}
+                  required
+                  onChange={() => setResult('SUCCESS')}
+                />{' '}
+                Réussie
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="step-result"
+                  value="FAILURE"
+                  checked={result === 'FAILURE'}
+                  required
+                  onChange={() => setResult('FAILURE')}
+                />{' '}
+                Échouée
+              </label>
+            </div>
+            {fieldErrors.result && (
+              <p className="entry-field-error" id="result-error">
+                {fieldErrors.result}
+              </p>
+            )}
+          </fieldset>
           <div className="field">
             <label htmlFor="step-observations">Observations</label>
             <textarea
               id="step-observations"
-              rows={4}
+              placeholder="Ex. Épaisseur inférieure à la valeur cible"
+              rows={3}
               value={observations}
               disabled={busy}
               onChange={(event) => setObservations(event.target.value)}
             />
           </div>
-          <button
-            type="submit"
-            className="button button-primary"
-            disabled={busy || !type}
-          >
-            {busy ? 'Enregistrement…' : 'Enregistrer l’étape'}
-          </button>
+          <div className="field">
+            <label htmlFor="performed-at">Date de réalisation *</label>
+            <input
+              id="performed-at"
+              type="datetime-local"
+              step="1"
+              required
+              value={performedAt}
+              disabled={busy}
+              aria-invalid={!!fieldErrors.date}
+              aria-describedby={fieldErrors.date ? 'date-error' : undefined}
+              onChange={(event) => setPerformedAt(event.target.value)}
+            />
+            {fieldErrors.date && (
+              <p className="entry-field-error" id="date-error">
+                {fieldErrors.date}
+              </p>
+            )}
+          </div>
+          <OperatorSelect
+            value={operatorId}
+            onChange={setOperatorId}
+            disabled={busy}
+          />
+          {actionsHost ? createPortal(actions, actionsHost) : actions}
           {busy && <p role="status">Enregistrement de l’étape en cours…</p>}
         </form>
       )}
-      <button
-        type="button"
-        className="button button-secondary cancel-step"
-        onClick={onCancel}
-        disabled={busy}
-      >
-        Annuler la saisie
-      </button>
+      {(!types || types.length === 0) && (
+        <button
+          type="button"
+          className="button button-secondary"
+          onClick={onCancel}
+          disabled={busy}
+        >
+          Annuler la saisie
+        </button>
+      )}
     </section>
   )
 }

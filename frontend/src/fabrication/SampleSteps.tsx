@@ -1,13 +1,20 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useAuth } from '../auth/context'
-import { formatDate } from '../samples/api'
 import type { Sample } from '../samples/api'
 import { useSampleQuery } from '../samples/useSampleQuery'
 import { getSteps } from './api'
-import { StepForm } from './StepForm'
-import { StepCorrections } from './StepCorrections'
+import { createPortal } from 'react-dom'
+import { StepEntryDrawer } from './StepEntryDrawer'
+import { TimelineStep } from './TimelineStep'
+import './timeline.css'
 
-export function SampleSteps({ sample }: { sample: Sample }) {
+export function SampleSteps({
+  sample,
+  actionHost,
+}: {
+  sample: Sample
+  actionHost: HTMLElement | null
+}) {
   const { api, user } = useAuth()
   const load = useCallback(
     (signal: AbortSignal) => getSteps(api, sample.id, signal),
@@ -16,6 +23,10 @@ export function SampleSteps({ sample }: { sample: Sample }) {
   const history = useSampleQuery(load)
   const [editing, setEditing] = useState(false)
   const [notice, setNotice] = useState(false)
+  const openButton = useRef<HTMLButtonElement>(null)
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(
+    () => new Set(),
+  )
   const authorized = user?.role === 'ADMIN' || user?.id === sample.creatorId
   const canCreate = authorized && sample.status !== 'ABANDONED'
   return (
@@ -23,19 +34,24 @@ export function SampleSteps({ sample }: { sample: Sample }) {
       <div className="page-heading">
         <div>
           <h2 id="history-title">Historique de fabrication</h2>
-          <p className="muted">De la première à la dernière réalisation.</p>
         </div>
-        {canCreate && !editing && (
-          <button
-            className="button button-primary"
-            onClick={() => {
-              setNotice(false)
-              setEditing(true)
-            }}
-          >
-            Enregistrer une étape
-          </button>
-        )}
+        {canCreate &&
+          actionHost &&
+          createPortal(
+            <button
+              ref={openButton}
+              aria-expanded={editing}
+              aria-controls="step-entry-dialog"
+              className="button button-primary"
+              onClick={() => {
+                setNotice(false)
+                setEditing(true)
+              }}
+            >
+              Enregistrer une étape
+            </button>,
+            actionHost,
+          )}
       </div>
       {notice && (
         <p role="status" className="success-notice">
@@ -69,111 +85,31 @@ export function SampleSteps({ sample }: { sample: Sample }) {
       )}
       {history.data && (
         <ol className="step-history">
-          {history.data.map((step) => (
-            <li
-              className="sample-panel"
-              key={`${step.id}:${step.revision ?? 0}`}
-            >
-              <div className="step-heading">
-                <h3>{step.operationName}</h3>
-                <span
-                  className={`status-tag ${step.result === 'FAILURE' ? 'status-failure' : ''}`}
-                >
-                  {step.result === 'SUCCESS'
-                    ? 'Réussie (SUCCESS)'
-                    : step.result === 'FAILURE'
-                      ? 'Échouée (FAILURE)'
-                      : 'Résultat non renseigné'}
-                </span>
-              </div>
-              {step.stepType && (
-                <p className="muted">
-                  Type : {step.stepType.code} — {step.stepType.name}
-                </p>
-              )}
-              <dl className="sample-facts">
-                <div>
-                  <dt>Réalisation</dt>
-                  <dd>
-                    <time dateTime={step.performedAt}>
-                      {formatDate(step.performedAt)}
-                    </time>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Auteur de saisie</dt>
-                  <dd>{step.recordedBy.name}</dd>
-                </div>
-                <div>
-                  <dt>Opérateur réel</dt>
-                  <dd>{step.operator?.name ?? 'Non renseigné'}</dd>
-                </div>
-                <div>
-                  <dt>Enregistrement</dt>
-                  <dd>
-                    <time dateTime={step.recordedAt}>
-                      {formatDate(step.recordedAt)}
-                    </time>
-                  </dd>
-                </div>
-              </dl>
-              {step.parameterValues.length > 0 && (
-                <>
-                  <h4>Paramètres</h4>
-                  <dl className="sample-facts">
-                    {step.parameterValues.map((value) => (
-                      <div key={value.id}>
-                        <dt>
-                          {value.definition.name}
-                          {value.definition.unit
-                            ? ` (${value.definition.unit})`
-                            : ''}
-                        </dt>
-                        <dd className="parameter-value">
-                          {value.definition.dataType === 'NUMBER'
-                            ? value.numericValue
-                            : value.definition.dataType === 'BOOLEAN'
-                              ? value.booleanValue === null
-                                ? 'Non renseigné'
-                                : value.booleanValue
-                                  ? 'Oui'
-                                  : 'Non'
-                              : value.textValue}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </>
-              )}
-              {step.parameters !== null && (
-                <>
-                  <h4>Paramètres textuels historiques</h4>
-                  <p className="sample-description">
-                    {step.parameters || 'Texte vide.'}
-                  </p>
-                </>
-              )}
-              {step.observations !== null && (
-                <>
-                  <h4>Observations</h4>
-                  <p className="sample-description">
-                    {step.observations || 'Aucune observation.'}
-                  </p>
-                </>
-              )}
-              <StepCorrections
-                step={step}
-                sampleId={sample.id}
-                authorized={authorized}
-                onUpdated={history.retry}
-              />
-            </li>
+          {history.data.map((step, index) => (
+            <TimelineStep
+              key={step.id}
+              step={step}
+              position={index + 1}
+              sampleId={sample.id}
+              authorized={authorized}
+              onUpdated={history.retry}
+              expanded={expandedSteps.has(step.id)}
+              onToggle={() =>
+                setExpandedSteps((current) => {
+                  const next = new Set(current)
+                  if (next.has(step.id)) next.delete(step.id)
+                  else next.add(step.id)
+                  return next
+                })
+              }
+            />
           ))}
         </ol>
       )}
       {canCreate && editing && (
-        <StepForm
-          sampleId={sample.id}
+        <StepEntryDrawer
+          sample={sample}
+          openerRef={openButton}
           onCancel={() => setEditing(false)}
           onCreated={() => {
             setEditing(false)

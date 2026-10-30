@@ -5,6 +5,7 @@ export type UserProfile = {
   email: string
   role: Role
   createdAt: string
+  isActive: boolean
 }
 export type LoginResponse = {
   access_token: string

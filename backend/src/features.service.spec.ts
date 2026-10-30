@@ -22,6 +22,28 @@ describe('Comptes RESEARCHER (Prisma simulé)', () => {
     { user } as unknown as PrismaService,
     passwords as unknown as PasswordService,
   );
+  it('sélectionne uniquement id et nom pour les opérateurs sans filtrer arbitrairement les rôles', async () => {
+    user.findMany.mockResolvedValue([
+      {
+        id: 'researcher',
+        name: 'Alex',
+        email: 'hidden@example.test',
+        role: 'RESEARCHER',
+        passwordHash: 'hidden',
+      },
+      { id: 'admin', name: 'Sam', role: 'ADMIN' },
+    ]);
+    expect(await service.findOperators()).toEqual([
+      { id: 'researcher', name: 'Alex' },
+      { id: 'admin', name: 'Sam' },
+    ]);
+    expect(user.findMany).toHaveBeenCalledWith({
+      select: { id: true, name: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+    expect(user.create).not.toHaveBeenCalled();
+    expect(passwords.hash).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     user.create.mockReset();
     user.findMany.mockReset();
@@ -48,6 +70,7 @@ describe('Comptes RESEARCHER (Prisma simulé)', () => {
         email: true,
         role: true,
         createdAt: true,
+        isActive: true,
       },
     });
   });
@@ -78,6 +101,7 @@ describe('Comptes RESEARCHER (Prisma simulé)', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
   it('liste sans mot de passe ni empreinte', async () => {
+    user.findMany.mockResolvedValue([]);
     await service.findAll();
     expect(user.findMany.mock.calls[0][0].select).not.toHaveProperty(
       'passwordHash',

@@ -14,6 +14,7 @@ import { SampleSteps } from '../fabrication/SampleSteps'
 import { NumericSearch } from './NumericSearch'
 import { StatusControl } from './StatusControl'
 import type { Sample } from './api'
+import './entry-forms.css'
 
 function QueryError({
   message,
@@ -41,7 +42,8 @@ export function SamplesPage() {
   const definitionId = search.get('parameterDefinitionId') || ''
   const min = search.get('min') || ''
   const max = search.get('max') || ''
-  const [advanced, setAdvanced] = useState(false)
+  const [advanced, setAdvanced] = useState(!!(definitionId || min || max))
+  const [filtersMounted, setFiltersMounted] = useState(advanced)
   const load = useCallback(
     (signal: AbortSignal) =>
       listSamples(api, q, signal, {
@@ -53,8 +55,8 @@ export function SamplesPage() {
   )
   const result = useSampleQuery(load)
   return (
-    <section className="page">
-      <p className="eyebrow">ESPACE DU LABORATOIRE</p>
+    <section className="page samples-page">
+      <p className="eyebrow">Centre de microélectronique</p>
       <div className="page-heading">
         <div>
           <h1>Échantillons</h1>
@@ -92,38 +94,49 @@ export function SamplesPage() {
           setSearch(params)
         }}
       >
-        <div className="field">
-          <label htmlFor="sample-search">Référence ou nom</label>
-          <input
-            id="sample-search"
-            name="q"
-            type="search"
-            defaultValue={q}
-            placeholder="Ex. K24-017"
-          />
-        </div>
-        <button
-          type="button"
-          className="button button-secondary"
-          onClick={() => setAdvanced((current) => !current)}
-          aria-expanded={advanced || !!definitionId || !!min || !!max}
-        >
-          Recherche par paramètres
-        </button>
-        {(advanced || definitionId || min || max) && (
-          <NumericSearch definitionId={definitionId} min={min} max={max} />
-        )}
-        <button className="button button-primary" type="submit">
-          Rechercher
-        </button>
-        {(q || definitionId || min || max) && (
+        <div className="sample-search-row">
+          <div className="field">
+            <label htmlFor="sample-search">Référence ou nom</label>
+            <input
+              id="sample-search"
+              name="q"
+              type="search"
+              defaultValue={q}
+              placeholder="Ex. K24-017"
+            />
+          </div>
           <button
-            className="button button-secondary"
             type="button"
-            onClick={() => setSearch({})}
+            className="button button-secondary sample-filter-toggle"
+            onClick={() => {
+              setFiltersMounted(true)
+              setAdvanced((current) => !current)
+            }}
+            aria-expanded={advanced}
+            aria-controls="numeric-filters"
           >
-            Effacer la recherche
+            Filtres
           </button>
+          <button className="button button-primary" type="submit">
+            Rechercher
+          </button>
+          {(q || definitionId || min || max) && (
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={() => setSearch({})}
+            >
+              Effacer la recherche
+            </button>
+          )}
+        </div>
+        {(filtersMounted || definitionId || min || max) && (
+          <NumericSearch
+            definitionId={definitionId}
+            min={min}
+            max={max}
+            hidden={!advanced}
+          />
         )}
       </form>
       {result.loading && <p role="status">Chargement des échantillons…</p>}
@@ -133,7 +146,9 @@ export function SamplesPage() {
       {result.data && (
         <>
           <p className="muted" role="status">
-            {result.data.length} échantillon(s){q ? ` pour « ${q} »` : ''}
+            {result.data.length}{' '}
+            {result.data.length > 1 ? 'échantillons' : 'échantillon'}
+            {q ? ` pour « ${q} »` : ''}
           </p>
           {result.data.length === 0 ? (
             <div className="placeholder-card">
@@ -147,32 +162,53 @@ export function SamplesPage() {
               </p>
             </div>
           ) : (
-            <ul className="sample-list">
-              {result.data.map((sample) => (
-                <li className="sample-card" key={sample.id}>
-                  <div>
-                    <p className="sample-reference">{sample.reference}</p>
-                    <h2>
-                      <Link to={`/samples/${encodeURIComponent(sample.id)}`}>
-                        {sample.name}
-                      </Link>
-                    </h2>
-                  </div>
-                  <span className="status-tag">
-                    {sampleStatus(sample.status)}
-                  </span>
-                  <p className="sample-description">
-                    {sample.description || 'Aucune description.'}
-                  </p>
-                  <p className="muted">
-                    Créé le{' '}
-                    <time dateTime={sample.createdAt}>
-                      {formatDate(sample.createdAt)}
-                    </time>
-                  </p>
-                </li>
-              ))}
-            </ul>
+            <div
+              className="sample-table-region"
+              role="region"
+              aria-label="Liste des échantillons"
+              tabIndex={0}
+            >
+              <table className="sample-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Référence</th>
+                    <th scope="col">Nom</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col">Détails</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.data.map((sample) => (
+                    <tr key={sample.id}>
+                      <th scope="row" className="sample-reference">
+                        {sample.reference}
+                      </th>
+                      <td className="sample-name-cell">
+                        <Link to={`/samples/${encodeURIComponent(sample.id)}`}>
+                          {sample.name}
+                        </Link>
+                      </td>
+                      <td>
+                        <span
+                          className={`status-tag ${sample.status === 'ABANDONED' ? 'status-warning' : ''}`}
+                        >
+                          {sampleStatus(sample.status)}
+                        </span>
+                      </td>
+                      <td>
+                        <Link
+                          className="sample-detail-link"
+                          to={`/samples/${encodeURIComponent(sample.id)}`}
+                          aria-label={`Voir les détails de ${sample.reference}`}
+                        >
+                          Voir
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}
@@ -189,9 +225,10 @@ export function SampleDetailPage() {
   )
   const result = useSampleQuery(load)
   const [updated, setUpdated] = useState<Sample | null>(null)
+  const [stepActions, setStepActions] = useState<HTMLDivElement | null>(null)
   const sample = updated?.id === result.data?.id ? updated : result.data
   return (
-    <section className="page">
+    <section className="page sample-detail-page">
       <Link className="back-link" to="/samples">
         ← Tous les échantillons
       </Link>
@@ -206,32 +243,24 @@ export function SampleDetailPage() {
               <p className="eyebrow sample-reference">{sample.reference}</p>
               <h1>{sample.name}</h1>
             </div>
-            <span className="status-tag">{sampleStatus(sample.status)}</span>
+            <span
+              className={`status-tag ${sample.status === 'ABANDONED' ? 'status-warning' : ''}`}
+            >
+              {sampleStatus(sample.status)}
+            </span>
           </div>
-          <div className="sample-panel">
-            <h2>Description</h2>
+          <div className="step-entry-trigger" ref={setStepActions} />
+          <div className="sample-detail-overview">
             <p className="sample-description">
               {sample.description || 'Aucune description.'}
             </p>
             <dl className="sample-facts">
               <div>
-                <dt>Référence</dt>
-                <dd>{sample.reference}</dd>
-              </div>
-              <div>
-                <dt>Identifiant technique</dt>
-                <dd>{sample.id}</dd>
-              </div>
-              <div>
-                <dt>Propriétaire (identifiant)</dt>
+                <dt>Propriétaire</dt>
                 <dd>
-                  {sample.creatorId}
+                  Nom non disponible
                   {sample.creatorId === user?.id ? ' (vous)' : ''}
                 </dd>
-              </div>
-              <div>
-                <dt>Statut</dt>
-                <dd>{sampleStatus(sample.status)}</dd>
               </div>
               <div>
                 <dt>Création</dt>
@@ -251,14 +280,15 @@ export function SampleDetailPage() {
               </div>
             </dl>
           </div>
+          <SampleSteps
+            key={`steps:${sample.id}:${sample.status}`}
+            sample={sample}
+            actionHost={stepActions}
+          />
           <StatusControl
             key={`status:${sample.id}:${sample.status}`}
             sample={sample}
             onUpdated={setUpdated}
-          />
-          <SampleSteps
-            key={`steps:${sample.id}:${sample.status}`}
-            sample={sample}
           />
         </>
       )}
@@ -326,14 +356,13 @@ export function CreateSamplePage() {
         </div>
       </div>
       <form
-        className="sample-panel sample-form"
+        className="sample-panel sample-form compact-sample-form"
         onSubmit={(event) => {
           event.preventDefault()
           void submit()
         }}
         aria-busy={busy}
       >
-        <p>Les champs marqués * sont obligatoires.</p>
         {error && (
           <div className="alert" role="alert">
             <p>{error}</p>
@@ -350,37 +379,38 @@ export function CreateSamplePage() {
           <label htmlFor="reference">Référence *</label>
           <input
             id="reference"
+            placeholder="Ex. K24-017"
             value={reference}
             onChange={(event) => setReference(event.target.value)}
             required
             disabled={busy}
-            aria-describedby="reference-help"
           />
-          <p id="reference-help" className="muted">
-            Une référence unique, par exemple K24-017.
-          </p>
         </div>
         <div className="field">
           <label htmlFor="sample-name">Nom *</label>
           <input
             id="sample-name"
+            placeholder="Ex. Capteur de pression · film PET"
             value={name}
             onChange={(event) => setName(event.target.value)}
             required
             disabled={busy}
           />
         </div>
-        <div className="field">
-          <label htmlFor="description">Description</label>
+        <div className="field sample-description-field">
+          <label htmlFor="description">Description (facultatif)</label>
           <textarea
             id="description"
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            rows={5}
+            rows={3}
             disabled={busy}
           />
         </div>
         <div className="form-actions">
+          <Link className="button button-secondary" to="/samples">
+            Annuler
+          </Link>
           <button
             className="button button-primary"
             type="submit"
@@ -388,9 +418,6 @@ export function CreateSamplePage() {
           >
             {busy ? 'Enregistrement…' : 'Enregistrer l’échantillon'}
           </button>
-          <Link className="button button-secondary" to="/samples">
-            Annuler
-          </Link>
         </div>
         {busy && <p role="status">Enregistrement en cours…</p>}
       </form>

@@ -75,30 +75,50 @@ export function fabricationMock() {
     },
   ];
   const sample = {
-    findUnique: jest
-      .fn()
-      .mockResolvedValue({
-        id: stepIds.sample,
-        creatorId: stepIds.owner,
-        status: 'ACTIVE',
-      }),
+    findUnique: jest.fn().mockResolvedValue({
+      id: stepIds.sample,
+      creatorId: stepIds.owner,
+      status: 'ACTIVE',
+    }),
   };
   const stepType = {
-    findUnique: jest
-      .fn()
-      .mockResolvedValue({
-        id: stepIds.type,
-        name: 'Dépôt',
-        code: 'DEPOSITION',
-        isActive: true,
-        parameters: definitions,
-      }),
+    findUnique: jest.fn().mockResolvedValue({
+      id: stepIds.type,
+      name: 'Dépôt',
+      code: 'DEPOSITION',
+      isActive: true,
+      parameters: definitions,
+    }),
   };
   const users = [
-    { id: stepIds.owner, name: 'Propriétaire', role: 'RESEARCHER' },
-    { id: stepIds.admin, name: 'Administrateur', role: 'ADMIN' },
-    { id: stepIds.other, name: 'Autre chercheur', role: 'RESEARCHER' },
-    { id: stepIds.operator, name: 'Opérateur', role: 'RESEARCHER' },
+    {
+      id: stepIds.owner,
+      name: 'Propriétaire',
+      role: 'RESEARCHER',
+      isActive: true,
+      authVersion: 0,
+    },
+    {
+      id: stepIds.admin,
+      name: 'Administrateur',
+      role: 'ADMIN',
+      isActive: true,
+      authVersion: 0,
+    },
+    {
+      id: stepIds.other,
+      name: 'Autre chercheur',
+      role: 'RESEARCHER',
+      isActive: true,
+      authVersion: 0,
+    },
+    {
+      id: stepIds.operator,
+      name: 'Opérateur',
+      role: 'RESEARCHER',
+      isActive: true,
+      authVersion: 0,
+    },
   ];
   const user = {
     findUnique: jest

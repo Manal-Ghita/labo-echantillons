@@ -5,6 +5,9 @@ import type {
   StepType,
 } from '../src/fabrication/api'
 
+// Exercise a non-whole-hour offset, independent of the machine running tests.
+test.use({ timezoneId: 'Asia/Kathmandu' })
+
 const owner = '87da980d-d334-48ae-9a09-bdd68a1feaa8'
 const sampleId = '5d8f6fc0-32d9-4828-acab-a0d18ba340ad'
 const typeId = '06d1546b-65cf-4fe6-a35e-84164b90af14'
@@ -72,6 +75,7 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
   test(`enregistre ${result} avec précision décimale et actualise l’historique`, async ({
     page,
   }, testInfo) => {
+    await page.clock.setFixedTime(new Date('2026-10-30T13:14:15Z'))
     let created: FabricationStep | null = null
     await page.route('http://localhost:3000/**', async (route) => {
       const request = route.request()
@@ -87,7 +91,7 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
           json: {
             id: owner,
             name: 'Camille',
-            role: 'RESEARCHER',
+            role: 'RESEARCHER', isActive: true,
             email: 'camille@example.test',
             createdAt: legacy.recordedAt,
           },
@@ -109,6 +113,14 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
             originStepId: null,
           },
         })
+      if (path === '/users/operators')
+        return route.fulfill({
+          headers: cors,
+          json: [
+            { id: owner, name: 'Camille' },
+            { id: '8b717a1a-629e-4871-935b-7f4d60976772', name: 'Alex' },
+          ],
+        })
       if (path === '/step-types')
         return route.fulfill({ headers: cors, json: [type] })
       if (path === `/samples/${sampleId}/steps`) {
@@ -121,10 +133,12 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
             { definitionId: definitionIds[2], value: false },
           ])
           expect(body).not.toHaveProperty('recordedById')
-          expect(body).not.toHaveProperty('operatorId')
-          expect(body.performedAt).toBe(
-            new Date('2026-10-29T10:30:00').toISOString(),
+          expect(body.operatorId).toBe(
+            result === 'SUCCESS'
+              ? owner
+              : '8b717a1a-629e-4871-935b-7f4d60976772',
           )
+          expect(body.performedAt).toBe('2026-10-29T04:45:00.000Z')
           const response = {
             ...legacy,
             id: 'new-step',
@@ -179,14 +193,82 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
       ),
     )
     await page.goto(`/samples/${sampleId}`)
-    await expect(page.getByText('Puissance = 120 W')).toBeVisible()
+    await page.locator('.timeline-toggle').first().click()
+    await expect(
+      page.locator('.timeline-details').first().getByText('Puissance = 120 W'),
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Enregistrer une étape' }).click()
+    await expect(page.locator('.step-entry-context')).toHaveText(
+      'K24-017 · Silicium',
+    )
+    await expect(page.locator('#performed-at')).toHaveValue(
+      '2026-10-30T18:59:15',
+    )
+    const save = page.getByRole('button', {
+      name: 'Enregistrer l’étape',
+      exact: true,
+    })
+    await expect(save).toBeEnabled()
+    await save.click()
+    await expect(page.locator('#step-type')).toHaveAttribute(
+      'aria-invalid',
+      'true',
+    )
+    await expect(
+      page.getByRole('group', { name: 'Résultat *' }),
+    ).toHaveAttribute('aria-invalid', 'true')
     await page.getByLabel('Type d’opération *').selectOption(typeId)
     await page.getByLabel('Date de réalisation *').fill('2026-10-29T10:30')
-    await page.getByLabel('Résultat *').selectOption(result)
-    await page.getByLabel('Température (°C) *').fill(precise)
+    await page
+      .getByRole('radio', {
+        name: result === 'SUCCESS' ? 'Réussie' : 'Échouée',
+      })
+      .check()
+    await page
+      .getByLabel('Température (°C) *')
+      .fill(result === 'SUCCESS' ? precise.replace('.', ',') : precise)
     await page.getByLabel('Gaz', { exact: true }).fill('Argon')
     await page.getByLabel('Sous vide *').selectOption('false')
+    await expect(
+      page.getByLabel('Opérateur réel', { exact: true }),
+    ).toHaveValue(owner)
+    if (result === 'FAILURE') {
+      await page.getByLabel('Rechercher un opérateur par nom').fill('alex')
+      await page
+        .getByLabel('Opérateur réel', { exact: true })
+        .selectOption('8b717a1a-629e-4871-935b-7f4d60976772')
+    }
+    const fields = [
+      '#step-type',
+      `#parameter-${definitionIds[0]}`,
+      '.step-result-options',
+      '#step-observations',
+      '#performed-at',
+      '#step-operator',
+    ]
+    const positions = await Promise.all(
+      fields.map((selector) => page.locator(selector).boundingBox()),
+    )
+    for (let i = 1; i < positions.length; i++)
+      expect(positions[i]!.y).toBeGreaterThan(positions[i - 1]!.y)
+    const submitBox = (await save.boundingBox())!
+    const cancelBox = (await page
+      .getByRole('button', { name: 'Annuler la saisie' })
+      .boundingBox())!
+    expect(submitBox.y).toBeCloseTo(cancelBox.y, 0)
+    expect(submitBox.width).toBeLessThan(
+      (await page.locator('.step-entry form').boundingBox())!.width,
+    )
+    for (const selector of [
+      '#step-type',
+      `#parameter-${definitionIds[0]}`,
+      '#performed-at',
+      '#step-operator',
+    ]) {
+      const height = (await page.locator(selector).boundingBox())!.height
+      expect(height).toBeGreaterThanOrEqual(44)
+      expect(height).toBeLessThanOrEqual(48)
+    }
     await page
       .getByLabel('Observations', { exact: true })
       .fill('Essai navigateur')
@@ -204,13 +286,15 @@ for (const result of ['SUCCESS', 'FAILURE'] as const) {
     await expect(
       page.getByText('Étape enregistrée.', { exact: true }),
     ).toBeVisible()
-    await expect(page.getByText(precise, { exact: true })).toBeVisible()
+    await page.locator('.timeline-toggle').last().click()
+    await expect(
+      page.getByText(precise.replace('.', ',') + ' °C', { exact: true }),
+    ).toBeVisible()
     await expect(page.getByText('Non', { exact: true })).toBeVisible()
     await expect(
-      page.getByText(
-        result === 'SUCCESS' ? 'Réussie (SUCCESS)' : 'Échouée (FAILURE)',
-        { exact: true },
-      ),
+      page.getByText(result === 'SUCCESS' ? 'Réussie' : 'Échouée', {
+        exact: true,
+      }),
     ).toBeVisible()
     const items = page.locator('.step-history > li')
     await expect(items).toHaveCount(2)

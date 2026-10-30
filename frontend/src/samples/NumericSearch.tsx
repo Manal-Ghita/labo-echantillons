@@ -7,10 +7,12 @@ export function NumericSearch({
   definitionId,
   min,
   max,
+  hidden = false,
 }: {
   definitionId: string
   min: string
   max: string
+  hidden?: boolean
 }) {
   const { api } = useAuth()
   const [selected, setSelected] = useState(definitionId)
@@ -28,12 +30,22 @@ export function NumericSearch({
     ...p,
     operation: `${p.stepType.code} — ${p.stepType.name}${p.stepType.isActive ? '' : ' (archivé)'}`,
   }))
+  const unit = definitions?.find(
+    (definition) => definition.id === selected,
+  )?.unit
   return (
-    <fieldset className="parameter-fields">
+    <fieldset
+      className="parameter-fields numeric-filters"
+      id="numeric-filters"
+      hidden={hidden}
+    >
       <legend>Paramètre numérique</legend>
       <p className="muted">
-        Bornes inclusives sur la valeur courante d’une étape, réussie ou
-        échouée. Point décimal, sans exposant.
+        Retrouver les échantillons dont une étape a une valeur comprise entre
+        ces deux bornes.
+      </p>
+      <p className="muted numeric-input-help" id="numeric-input-help">
+        Bornes inclusives. Point décimal, sans exposant.
       </p>
       {catalogue.loading && <p role="status">Chargement des paramètres…</p>}
       {catalogue.error && (
@@ -51,14 +63,14 @@ export function NumericSearch({
         </>
       )}
       <div className="field">
-        <label htmlFor="numeric-definition">Définition du paramètre</label>
+        <label htmlFor="numeric-definition">Paramètre</label>
         <select
           id="numeric-definition"
           name="parameterDefinitionId"
           value={selected}
           onChange={(event) => setSelected(event.target.value)}
         >
-          <option value="">Sans filtre numérique</option>
+          <option value="">Choisir un paramètre</option>
           {selected && !definitions?.some((p) => p.id === selected) && (
             <option value={selected}>
               Définition sélectionnée : {selected}
@@ -80,7 +92,15 @@ export function NumericSearch({
           type="text"
           inputMode="decimal"
           defaultValue={min}
+          aria-describedby={
+            unit ? 'numeric-input-help numeric-min-unit' : 'numeric-input-help'
+          }
         />
+        {unit && (
+          <span className="numeric-unit" id="numeric-min-unit">
+            {unit}
+          </span>
+        )}
       </div>
       <div className="field">
         <label htmlFor="numeric-max">Valeur maximale</label>
@@ -90,7 +110,15 @@ export function NumericSearch({
           type="text"
           inputMode="decimal"
           defaultValue={max}
+          aria-describedby={
+            unit ? 'numeric-input-help numeric-max-unit' : 'numeric-input-help'
+          }
         />
+        {unit && (
+          <span className="numeric-unit" id="numeric-max-unit">
+            {unit}
+          </span>
+        )}
       </div>
     </fieldset>
   )

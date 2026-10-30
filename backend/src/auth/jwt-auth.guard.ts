@@ -12,7 +12,10 @@ import { AuthService } from './auth.service';
 export type AuthenticatedUser = Awaited<
   ReturnType<AuthService['findIdentity']>
 >;
-export type AuthenticatedRequest = Request & { user: AuthenticatedUser };
+export type AuthenticatedRequest = Request & {
+  user: AuthenticatedUser;
+  authVersion: number;
+};
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -28,22 +31,29 @@ export class JwtAuthGuard implements CanActivate {
     );
     if (!match) throw new UnauthorizedException('Token requis.');
     let subject: string;
+    let authVersion: number;
     try {
       const payload = await this.jwt.verifyAsync<{
         sub?: unknown;
         exp?: unknown;
+        authVersion?: unknown;
       }>(match[1]);
       if (
         typeof payload.sub !== 'string' ||
         !isUUID(payload.sub) ||
-        typeof payload.exp !== 'number'
+        typeof payload.exp !== 'number' ||
+        typeof payload.authVersion !== 'number' ||
+        !Number.isSafeInteger(payload.authVersion) ||
+        payload.authVersion < 0
       )
         throw new Error('Invalid claims');
       subject = payload.sub;
+      authVersion = payload.authVersion;
     } catch {
       throw new UnauthorizedException('Token invalide ou expiré.');
     }
-    request.user = await this.auth.findIdentity(subject);
+    request.user = await this.auth.findIdentity(subject, authVersion);
+    request.authVersion = authVersion;
     return true;
   }
 }

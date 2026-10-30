@@ -122,7 +122,9 @@ export function CataloguePage() {
                   {type.name}
                 </Link>
               </h2>
-              <span className="status-tag">
+              <span
+                className={`status-tag ${type.isActive ? '' : 'status-warning'}`}
+              >
                 {type.isActive ? 'Actif' : 'Inactif'}
               </span>
               <p className="sample-description">
@@ -198,7 +200,9 @@ function CatalogueDetails({ type, admin }: { type: StepType; admin: boolean }) {
           <p className="eyebrow sample-reference">{current.code}</p>
           <h1>{current.name}</h1>
         </div>
-        <span className="status-tag">
+        <span
+          className={`status-tag ${current.isActive ? '' : 'status-warning'}`}
+        >
           {current.isActive ? 'Actif' : 'Inactif'}
         </span>
       </div>

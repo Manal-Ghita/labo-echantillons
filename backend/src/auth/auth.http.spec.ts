@@ -34,6 +34,8 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
     email: 'researcher@example.test',
     role: 'RESEARCHER',
     createdAt: new Date('2026-01-01'),
+    isActive: true,
+    authVersion: 0,
   };
   const prisma = {
     user: { findUnique: jest.fn() },
@@ -53,7 +55,7 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
     app = module.createNestApplication();
     await app.init();
     jwt = module.get(JwtService);
-    token = await jwt.signAsync({ sub: id });
+    token = await jwt.signAsync({ authVersion: 0, sub: id });
   });
   beforeEach(() => {
     jest.resetAllMocks();
@@ -159,7 +161,11 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
       .auth(token, { type: 'bearer' })
       .expect(200);
     expect(response.body).toEqual({
-      ...user,
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isActive: true,
       createdAt: user.createdAt.toISOString(),
     });
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
@@ -170,6 +176,8 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
         email: true,
         role: true,
         createdAt: true,
+        isActive: true,
+        authVersion: true,
       },
     });
   });
@@ -198,21 +206,27 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
       .expect(401);
   });
   it('refuse un token expiré', async () => {
-    const expired = await jwt.signAsync({ sub: id }, { expiresIn: -1 });
+    const expired = await jwt.signAsync(
+      { authVersion: 0, sub: id },
+      { expiresIn: -1 },
+    );
     await request(app.getHttpServer())
       .get('/auth/me')
       .auth(expired, { type: 'bearer' })
       .expect(401);
   });
   it('refuse un autre destinataire', async () => {
-    const other = await jwt.signAsync({ sub: id }, { audience: 'other-api' });
+    const other = await jwt.signAsync(
+      { authVersion: 0, sub: id },
+      { audience: 'other-api' },
+    );
     await request(app.getHttpServer())
       .get('/auth/me')
       .auth(other, { type: 'bearer' })
       .expect(401);
   });
   it('refuse un sujet invalide', async () => {
-    const bad = await jwt.signAsync({ sub: 'not-a-uuid' });
+    const bad = await jwt.signAsync({ authVersion: 0, sub: 'not-a-uuid' });
     await request(app.getHttpServer())
       .get('/auth/me')
       .auth(bad, { type: 'bearer' })
@@ -273,7 +287,11 @@ describe('Authentification et samples HTTP (Prisma simulé)', () => {
       .expect(403);
   });
   it('utilise le rôle courant en base plutôt qu’un rôle revendiqué dans le token', async () => {
-    const claimed = await jwt.signAsync({ sub: id, role: 'ADMIN' });
+    const claimed = await jwt.signAsync({
+      authVersion: 0,
+      sub: id,
+      role: 'ADMIN',
+    });
     await request(app.getHttpServer())
       .get('/test-admin')
       .auth(claimed, { type: 'bearer' })

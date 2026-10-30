@@ -11,7 +11,7 @@ const profile = {
   id: 'catalogue-browser-user',
   name: 'Camille Test',
   email: 'camille@example.test',
-  role: 'ADMIN',
+  role: 'ADMIN', isActive: true,
   createdAt: '2026-10-29T08:00:00Z',
 }
 const seed: StepType = {

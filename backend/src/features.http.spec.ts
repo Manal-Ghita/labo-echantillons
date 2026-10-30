@@ -23,6 +23,8 @@ describe('Nouveaux endpoints HTTP avec vrais guards et Prisma simulé', () => {
       email: 'owner@example.test',
       role: 'RESEARCHER',
       createdAt: new Date(),
+      isActive: true,
+      authVersion: 0,
     },
     {
       id: stepIds.other,
@@ -30,6 +32,8 @@ describe('Nouveaux endpoints HTTP avec vrais guards et Prisma simulé', () => {
       email: 'other@example.test',
       role: 'RESEARCHER',
       createdAt: new Date(),
+      isActive: true,
+      authVersion: 0,
     },
     {
       id: stepIds.admin,
@@ -37,6 +41,8 @@ describe('Nouveaux endpoints HTTP avec vrais guards et Prisma simulé', () => {
       email: 'admin@example.test',
       role: 'ADMIN',
       createdAt: new Date(),
+      isActive: true,
+      authVersion: 0,
     },
   ];
   const sampleRecord = {
@@ -76,7 +82,8 @@ describe('Nouveaux endpoints HTTP avec vrais guards et Prisma simulé', () => {
       work(tx),
     ),
   };
-  const auth = (id: string) => 'Bearer ' + jwt.sign({ sub: id });
+  const auth = (id: string) =>
+    'Bearer ' + jwt.sign({ authVersion: 0, sub: id });
   beforeAll(async () => {
     process.env.JWT_SECRET = randomBytes(48).toString('base64url');
     const module = await Test.createTestingModule({ imports: [AppModule] })
@@ -124,6 +131,63 @@ describe('Nouveaux endpoints HTTP avec vrais guards et Prisma simulé', () => {
     email: 'new@example.test',
     password: 'test-password-only',
   };
+  it.each([stepIds.owner, stepIds.other, stepIds.admin])(
+    'autorise %s à consulter uniquement les identités des opérateurs',
+    async (id) => {
+      user.findMany.mockResolvedValue(
+        profiles.map((profile) => ({
+          ...profile,
+          passwordHash: 'must-not-leak',
+          password: 'must-not-leak',
+        })),
+      );
+      const response = await request(app.getHttpServer())
+        .get('/users/operators')
+        .set('Authorization', auth(id))
+        .expect(200);
+      expect(response.body).toEqual(
+        profiles.map(({ id, name }) => ({ id, name })),
+      );
+      expect(user.findMany).toHaveBeenCalledWith({
+        select: { id: true, name: true },
+        orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      });
+      for (const operator of response.body as Record<string, unknown>[])
+        expect(Object.keys(operator).sort()).toEqual(['id', 'name']);
+      expect(user.create).not.toHaveBeenCalled();
+    },
+  );
+  it('refuse les opérateurs sans JWT, avec un JWT invalide ou une identité supprimée', async () => {
+    await request(app.getHttpServer()).get('/users/operators').expect(401);
+    await request(app.getHttpServer())
+      .get('/users/operators')
+      .set('Authorization', 'Bearer invalid')
+      .expect(401);
+    await request(app.getHttpServer())
+      .get('/users/operators')
+      .set('Authorization', auth(stepIds.operator))
+      .expect(401);
+    expect(user.findMany).not.toHaveBeenCalled();
+  });
+  it('retourne une liste vide sans inventer un opérateur', async () => {
+    user.findMany.mockResolvedValue([]);
+    const response = await request(app.getHttpServer())
+      .get('/users/operators')
+      .set('Authorization', auth(stepIds.owner))
+      .expect(200);
+    expect(response.body).toEqual([]);
+  });
+  it('conserve GET /users exclusivement accessible à ADMIN', async () => {
+    await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', auth(stepIds.owner))
+      .expect(403);
+    expect(user.findMany).not.toHaveBeenCalled();
+    await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', auth(stepIds.admin))
+      .expect(200);
+  });
   it('crée RESEARCHER pour ADMIN sans exposer les secrets', async () => {
     const result = await request(app.getHttpServer())
       .post('/users')

@@ -33,9 +33,9 @@ describe('Étapes HTTP, vrais guards JWT/rôles et Prisma simulé', () => {
     await app.init();
     const jwt = module.get(JwtService);
     tokens = {
-      owner: await jwt.signAsync({ sub: stepIds.owner }),
-      admin: await jwt.signAsync({ sub: stepIds.admin }),
-      other: await jwt.signAsync({ sub: stepIds.other }),
+      owner: await jwt.signAsync({ authVersion: 0, sub: stepIds.owner }),
+      admin: await jwt.signAsync({ authVersion: 0, sub: stepIds.admin }),
+      other: await jwt.signAsync({ authVersion: 0, sub: stepIds.other }),
     };
   });
   beforeEach(() => {

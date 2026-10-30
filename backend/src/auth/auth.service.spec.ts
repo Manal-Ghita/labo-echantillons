@@ -14,6 +14,8 @@ describe('AuthService (Prisma simulé)', () => {
     email: 'test@example.test',
     role: 'RESEARCHER',
     passwordHash: 'test-hash',
+    isActive: true,
+    authVersion: 0,
   };
   beforeEach(() => {
     jest.resetAllMocks();
@@ -39,7 +41,10 @@ describe('AuthService (Prisma simulé)', () => {
       'test-password',
       user.passwordHash,
     );
-    expect(jwt.signAsync).toHaveBeenCalledWith({ sub: user.id });
+    expect(jwt.signAsync).toHaveBeenCalledWith({
+      sub: user.id,
+      authVersion: 0,
+    });
   });
   it('refuse un mot de passe incorrect sans signer', async () => {
     prisma.user.findUnique.mockResolvedValue(user);
@@ -61,17 +66,20 @@ describe('AuthService (Prisma simulé)', () => {
     expect(jwt.signAsync).not.toHaveBeenCalled();
   });
   it('ne sélectionne pas le hash pour une identité vérifiée', async () => {
-    const identity = { id: user.id };
+    const identity = { id: user.id, isActive: true, authVersion: 0 };
     prisma.user.findUnique.mockResolvedValue(identity);
-    await expect(service.findIdentity(user.id)).resolves.toEqual(identity);
+    await expect(service.findIdentity(user.id, 0)).resolves.toMatchObject({
+      id: user.id,
+      isActive: true,
+    });
     expect(prisma.user.findUnique).toHaveBeenCalledWith({
       where: { id: user.id },
-      select: publicUserSelect,
+      select: { ...publicUserSelect, authVersion: true },
     });
   });
   it('refuse une identité absente de la base', async () => {
     prisma.user.findUnique.mockResolvedValue(null);
-    await expect(service.findIdentity(user.id)).rejects.toBeInstanceOf(
+    await expect(service.findIdentity(user.id, 0)).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });

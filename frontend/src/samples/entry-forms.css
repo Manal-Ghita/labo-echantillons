@@ -1,0 +1,120 @@
+.compact-sample-form,
+.step-entry .sample-form {
+  gap: 1rem;
+  padding: clamp(1rem, 2.5vw, 1.75rem);
+}
+.compact-sample-form {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.compact-sample-form > .alert,
+.compact-sample-form > .sample-description-field,
+.compact-sample-form > .form-actions,
+.compact-sample-form > [role='status'] {
+  grid-column: 1 / -1;
+}
+.compact-sample-form > .form-actions {
+  justify-content: flex-end;
+}
+.compact-sample-form > .form-actions > .button {
+  width: auto;
+}
+@media (max-width: 640px) {
+  .compact-sample-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.compact-sample-form .field input,
+.step-entry .field input,
+.step-entry .field select {
+  min-height: 46px;
+  padding: 0.5rem 0.75rem;
+}
+.compact-sample-form .field textarea,
+.step-entry .field textarea {
+  padding: 0.5rem 0.75rem;
+  resize: vertical;
+}
+.step-entry > h2 {
+  font-size: 1.3rem;
+  margin-bottom: 1.25rem;
+}
+.step-entry-context {
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.step-entry .parameter-fields {
+  gap: 0.9rem;
+  padding: 0.85rem;
+}
+.step-entry .step-result-options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.step-entry .operator-picker {
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  margin: 0;
+  padding: 0.85rem;
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.operator-picker legend {
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.operator-picker > p {
+  margin: 0;
+  font-size: 0.8rem;
+}
+.step-result-options legend {
+  padding: 0;
+  font-size: 0.88rem;
+  font-weight: 650;
+  margin-bottom: 0.5rem;
+}
+.step-result-choices {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.step-result-choices label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.step-result-choices input {
+  margin: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+.entry-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: fit-content;
+  max-width: 100%;
+}
+.entry-actions > .button {
+  width: auto;
+  min-height: 44px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.8rem;
+}
+.step-entry .entry-field-error {
+  color: var(--color-error);
+  margin: 0;
+  font-size: 0.8rem;
+}
+.step-entry [aria-invalid='true']:not(fieldset) {
+  border-color: var(--color-error);
+}

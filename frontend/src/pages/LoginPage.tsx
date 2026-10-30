@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { ApiError, isAbortError } from '../api/client'
 import { useAuth } from '../auth/context'
@@ -10,6 +10,9 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const pending = useRef(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordHelp, setShowPasswordHelp] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const state = location.state as { from?: unknown } | null
   const from =
@@ -28,7 +31,8 @@ export function LoginPage() {
     )
   if (auth.user) return <Navigate to={from} replace />
   async function submit() {
-    if (submitting) return
+    if (pending.current) return
+    pending.current = true
     setSubmitting(true)
     setError(null)
     try {
@@ -38,68 +42,53 @@ export function LoginPage() {
       if (!isAbortError(caught))
         setError(
           caught instanceof ApiError
-            ? caught.message
+            ? caught.status === 401
+              ? 'Identifiants incorrects. Vérifiez votre adresse e-mail et votre mot de passe.'
+              : caught.message
             : 'La connexion a échoué. Veuillez réessayer.',
         )
     } finally {
       setPassword('')
+      setShowPassword(false)
+      pending.current = false
       setSubmitting(false)
     }
   }
   return (
     <main className="login-shell">
       <section className="login-intro" aria-label="Les échantillons du labo">
-        <div className="brand brand-light">
-          <span className="brand-mark" aria-hidden="true">
-            L.
-          </span>
-          <span>
-            Les échantillons
-            <br />
-            <strong>du labo</strong>
-          </span>
-        </div>
+        <img className="login-photo" src="/images/wafer-login.png" alt="" />
         <div className="intro-copy">
-          <p className="eyebrow">DU PREMIER DÉPÔT AU DERNIER RÉGLAGE</p>
-          <h1>
-            Gardez le fil
-            <br />
-            de vos fabrications.
-          </h1>
-          <p>
-            Un espace commun pour suivre vos échantillons et retrouver
-            l’histoire de chaque étape.
+          <p className="intro-lab">Centre de microélectronique</p>
+          <h1>Plateforme de gestion des échantillons</h1>
+          <p className="login-features">
+            Suivi des échantillons, historique des opérations et
+            traçabilité des fabrications.
           </p>
-          <div className="sample-lines" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-        </div>
-        <p className="intro-footer">
-          Microélectronique · Recherche · Traçabilité
-        </p>
+</div>
       </section>
       <section className="login-form-panel" aria-labelledby="login-title">
         <div className="login-card">
-          <p className="eyebrow">VOTRE ESPACE DE RECHERCHE</p>
+          <img
+            className="login-logo"
+            src="/images/logo-labo.png"
+            alt="Les échantillons du labo"
+          />
+          <p className="login-platform-name">LIMS Salle Blanche</p>
           <h2 id="login-title">Connexion</h2>
-          <p className="muted">
-            Connectez-vous avec votre compte du laboratoire.
-          </p>
           {(error || auth.notice) && (
             <p className="alert" role="alert">
               {error || auth.notice}
             </p>
           )}
           <form
+            aria-busy={submitting}
             onSubmit={(event) => {
               event.preventDefault()
               void submit()
             }}
           >
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Adresse e-mail</label>
             <input
               id="email"
               type="email"
@@ -111,23 +100,71 @@ export function LoginPage() {
               disabled={submitting}
             />
             <label htmlFor="password">Mot de passe</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              maxLength={72}
-              disabled={submitting}
-            />
+            <div className="login-password-field">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
+                maxLength={72}
+                disabled={submitting}
+              />
+              <button
+                type="button"
+                className="login-password-toggle"
+                aria-label={
+                  showPassword
+                    ? 'Masquer le mot de passe'
+                    : 'Afficher le mot de passe'
+                }
+                aria-controls="password"
+                aria-pressed={showPassword}
+                disabled={submitting}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  aria-hidden="true"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                  {showPassword && <path d="m3 3 18 18" />}
+                </svg>
+              </button>
+            </div>
+            <button
+              type="button"
+              className="login-help-toggle"
+              aria-expanded={showPasswordHelp}
+              aria-controls="password-help"
+              onClick={() => setShowPasswordHelp((value) => !value)}
+            >
+              Mot de passe oublié ?
+            </button>
+            {showPasswordHelp && (
+              <p
+                id="password-help"
+                className="login-password-help"
+                role="status"
+              >
+                Pour réinitialiser votre mot de passe, contactez la responsable
+                du laboratoire.
+              </p>
+            )}
             <button
               className="button button-primary"
               type="submit"
               disabled={submitting}
             >
-              {submitting ? 'Connexion…' : 'Se connecter'}
-              <span aria-hidden="true">→</span>
+              {submitting && (
+                <span className="login-spinner" aria-hidden="true" />
+              )}
+              {submitting ? 'Connexion en cours…' : 'Se connecter'}
             </button>
             {submitting && (
               <p className="form-status" role="status">
@@ -140,7 +177,6 @@ export function LoginPage() {
             laboratoire.
           </p>
         </div>
-        <p className="login-footer">Les échantillons du labo · ISMIN 2026</p>
       </section>
     </main>
   )

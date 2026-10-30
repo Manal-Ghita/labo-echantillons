@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth } from '../auth/context'
+import './workspace.css'
 
 export function AppLayout() {
   const { user, logout, hasRole } = useAuth()
@@ -15,14 +16,8 @@ export function AppLayout() {
       </a>
       <header className="app-header">
         <Link to="/samples" className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            L.
-          </span>
-          <span>
-            Les échantillons
-            <br />
-            <strong>du labo</strong>
-          </span>
+          <img className="app-logo" src="/images/logo-labo.png" alt="" />
+          <strong>LIMS Salle Blanche</strong>
         </Link>
         <nav aria-label="Navigation principale">
           <NavLink to="/samples">Échantillons</NavLink>
@@ -33,7 +28,9 @@ export function AppLayout() {
           <div>
             <strong>{user?.name}</strong>
             <span className="role-label">
-              {user?.role === 'ADMIN' ? 'Administration' : 'Recherche'}
+              {user?.role === 'ADMIN'
+                ? 'Administration'
+                : 'Personnel de recherche'}
             </span>
           </div>
           <button
@@ -48,9 +45,6 @@ export function AppLayout() {
       <main id="main-content" tabIndex={-1} className="workspace">
         <Outlet />
       </main>
-      <footer className="app-footer">
-        Les échantillons du labo <span>Suivi de fabrication · ISMIN 2026</span>
-      </footer>
     </div>
   )
 }

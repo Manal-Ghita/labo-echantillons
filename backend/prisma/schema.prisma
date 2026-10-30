@@ -40,6 +40,8 @@ model User {
   email           String            @unique
   passwordHash    String
   role            Role
+  isActive        Boolean           @default(true)
+  authVersion     Int               @default(0)
   createdAt       DateTime          @default(now()) @db.Timestamptz(3)
   samples         Sample[]
   recordedSteps   FabricationStep[] @relation("StepRecorder")

@@ -16,7 +16,7 @@
   gap: 1.5rem;
 }
 .catalogue-page .catalogue-parameters li {
-  border-top: 1px solid #dce5de;
+  border-top: 1px solid var(--color-border);
   padding-top: 1rem;
 }
 .catalogue-page .catalogue-parameters h3 {
@@ -26,7 +26,8 @@
   margin-top: 1.5rem;
 }
 .catalogue-page .catalogue-success {
-  background: #e8f0eb;
+  color: var(--color-success);
+  background: var(--color-success-soft);
   padding: 1rem;
   border-radius: 5px;
 }

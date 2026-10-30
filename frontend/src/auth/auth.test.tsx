@@ -13,7 +13,7 @@ const profile = {
   id: 'test-user',
   name: 'Camille Test',
   email: 'camille@example.test',
-  role: 'RESEARCHER',
+  role: 'RESEARCHER', isActive: true,
   createdAt: '2026-10-29T08:00:00.000Z',
 }
 const loginResponse = {
@@ -48,7 +48,7 @@ function validApi(role = 'RESEARCHER') {
 }
 async function signIn() {
   const user = userEvent.setup()
-  await user.type(screen.getByLabelText('Email'), profile.email)
+  await user.type(screen.getByLabelText('Adresse e-mail'), profile.email)
   await user.type(screen.getByLabelText('Mot de passe'), 'test-password')
   await user.click(screen.getByRole('button', { name: 'Se connecter' }))
   return user
@@ -71,6 +71,69 @@ afterEach(() => {
 })
 
 describe('Authentification et navigation', () => {
+  it('bascule le mot de passe au clavier sans modifier sa valeur ni envoyer de requête', async () => {
+    renderApp('/login')
+    const user = userEvent.setup()
+    const input = screen.getByLabelText('Mot de passe')
+    await user.type(input, 'unchanged-test-password')
+    await user.tab()
+    expect(
+      screen.getByRole('button', { name: 'Afficher le mot de passe' }),
+    ).toHaveFocus()
+    await user.keyboard('{Enter}')
+    expect(input).toHaveAttribute('type', 'text')
+    expect(input).toHaveValue('unchanged-test-password')
+    expect(
+      screen.getByRole('button', { name: 'Masquer le mot de passe' }),
+    ).toHaveAttribute('aria-pressed', 'true')
+    await user.keyboard(' ')
+    expect(input).toHaveAttribute('type', 'password')
+    expect(input).toHaveValue('unchanged-test-password')
+    expect(fetcher).not.toHaveBeenCalled()
+    expect(sessionStorage.length).toBe(0)
+  })
+  it('affiche une aide de réinitialisation sans navigation ni appel API', async () => {
+    renderApp('/login')
+    const user = userEvent.setup()
+    const help = screen.getByRole('button', { name: 'Mot de passe oublié ?' })
+    await user.click(help)
+    expect(help).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Pour réinitialiser votre mot de passe, contactez la responsable du laboratoire.',
+    )
+    expect(fetcher).not.toHaveBeenCalled()
+    await user.click(help)
+    expect(screen.queryByText(/Pour réinitialiser/)).not.toBeInTheDocument()
+  })
+  it('bloque les doubles soumissions puis réactive les champs après une erreur serveur', async () => {
+    let resolveLogin!: (response: Response) => void
+    fetcher.mockImplementation(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveLogin = resolve
+        }),
+    )
+    renderApp('/login')
+    const user = await signIn()
+    const loading = screen.getByRole('button', { name: 'Connexion en cours…' })
+    expect(loading).toBeDisabled()
+    expect(screen.getByLabelText('Adresse e-mail')).toBeDisabled()
+    expect(screen.getByLabelText('Mot de passe')).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Afficher le mot de passe' }),
+    ).toBeDisabled()
+    await user.click(loading)
+    await user.keyboard('{Enter}{Enter}')
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    await act(async () => resolveLogin(Response.json({}, { status: 503 })))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Le service est momentanément indisponible.',
+    )
+    expect(screen.getByRole('button', { name: 'Se connecter' })).toBeEnabled()
+    expect(screen.getByLabelText('Adresse e-mail')).toBeEnabled()
+    expect(screen.getByLabelText('Mot de passe')).toBeEnabled()
+    expect(screen.getByLabelText('Mot de passe')).toHaveValue('')
+  })
   it('redirige une route privée vers la connexion sans requête anonyme', async () => {
     renderApp('/step-types')
     expect(
@@ -86,7 +149,7 @@ describe('Authentification et navigation', () => {
       await screen.findByRole('heading', { name: 'Catalogue des opérations' }),
     ).toBeInTheDocument()
     expect(screen.getByText(profile.name)).toBeInTheDocument()
-    expect(screen.getByText('Recherche')).toBeInTheDocument()
+    expect(screen.getByText('Personnel de recherche')).toBeInTheDocument()
     expect(fetcher.mock.calls[0][0]).toBe('http://localhost:3000/auth/login')
     expect(JSON.parse(fetcher.mock.calls[0][1].body)).toEqual({
       email: profile.email,
@@ -106,7 +169,7 @@ describe('Authentification et navigation', () => {
     renderApp('/login')
     await signIn()
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Email ou mot de passe incorrect.',
+      'Identifiants incorrects. Vérifiez votre adresse e-mail et votre mot de passe.',
     )
     expect(fetcher).toHaveBeenCalledTimes(1)
     expect(sessionStorage.getItem(SESSION_KEY)).toBeNull()

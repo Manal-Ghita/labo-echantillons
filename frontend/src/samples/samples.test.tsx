@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,7 +10,7 @@ const profile = {
   id: 'owner-id',
   name: 'Camille',
   email: 'camille@example.test',
-  role: 'RESEARCHER',
+  role: 'RESEARCHER', isActive: true,
   createdAt: '2026-10-29T08:00:00Z',
 }
 const sample = {
@@ -65,15 +65,118 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Gestion des échantillons via le client HTTP authentifié', () => {
+  it('présente des exemples dans les champs et une description facultative de trois lignes', async () => {
+    open('/samples/new')
+    expect(
+      await screen.findByPlaceholderText('Ex. K24-017'),
+    ).toHaveAccessibleName('Référence *')
+    expect(
+      screen.getByPlaceholderText('Ex. Capteur de pression · film PET'),
+    ).toHaveAccessibleName('Nom *')
+    expect(screen.getByLabelText('Description (facultatif)')).toHaveAttribute(
+      'rows',
+      '3',
+    )
+    expect(
+      screen.queryByText('Les champs marqués * sont obligatoires.'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/Une référence unique, par exemple/),
+    ).not.toBeInTheDocument()
+  })
+  it('présente les données dans un tableau compact sans requête par échantillon', async () => {
+    business.mockResolvedValue(
+      Response.json([
+        { ...sample, status: 'ACTIVE' },
+        {
+          ...sample,
+          id: 'second-id',
+          reference: 'K24-018',
+          name: 'Autre wafer',
+          status: 'ABANDONED',
+        },
+      ]),
+    )
+    open()
+    const table = await screen.findByRole('table')
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((cell) => cell.textContent),
+    ).toEqual(['Référence', 'Nom', 'Statut', 'Détails'])
+    expect(
+      within(table).getByRole('rowheader', { name: 'K24-017' }),
+    ).toBeVisible()
+    expect(within(table).getByText('Actif')).toBeVisible()
+    expect(within(table).getByText('Abandonné')).toHaveClass('status-warning')
+    expect(within(table).queryByText('Non disponible')).not.toBeInTheDocument()
+    expect(
+      within(table).getByRole('link', { name: 'Voir les détails de K24-017' }),
+    ).toHaveAttribute('href', `/samples/${sample.id}`)
+    expect(business).toHaveBeenCalledTimes(1)
+    expect(business.mock.calls[0][0]).toBe('http://localhost:3000/samples')
+    expect(screen.getByRole('button', { name: 'Filtres' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
+    expect(screen.getByText('Centre de microélectronique')).toBeVisible()
+  })
+  it.each([0, 1, 2])(
+    'accorde correctement le compteur pour %i échantillon(s)',
+    async (count) => {
+      business.mockResolvedValue(
+        Response.json(
+          Array.from({ length: count }, (_, index) => ({
+            ...sample,
+            id: `sample-${index}`,
+            reference: `REF-${index}`,
+          })),
+        ),
+      )
+      open()
+      expect(
+        await screen.findByText(
+          `${count} ${count > 1 ? 'échantillons' : 'échantillon'}`,
+        ),
+      ).toHaveAttribute('role', 'status')
+    },
+  )
+  it.each([
+    ['RESEARCHER', 'Personnel de recherche'],
+    ['ADMIN', 'Administration'],
+  ])(
+    'conserve une identité et un rôle neutre pour %s, sans pied de page',
+    async (role, label) => {
+      fetcher.mockImplementation((url: string, options: RequestInit) =>
+        url.endsWith('/auth/me')
+          ? Promise.resolve(Response.json({ ...profile, role }))
+          : business(url, options),
+      )
+      open()
+      const brand = await screen.findByRole('link', {
+        name: 'LIMS Salle Blanche',
+      })
+      expect(brand.querySelector('img')).toHaveAttribute(
+        'src',
+        '/images/logo-labo.png',
+      )
+      expect(screen.getByText(label)).toBeVisible()
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
+      expect(screen.queryByText('L.')).not.toBeInTheDocument()
+      expect(screen.queryByText(/ISMIN 2026/)).not.toBeInTheDocument()
+    },
+  )
   it('charge la liste et ouvre le détail avec les champs réellement exposés', async () => {
     open()
     await userEvent.click(await screen.findByRole('link', { name: 'Silicium' }))
     expect(
       await screen.findByRole('heading', { name: 'Silicium' }),
     ).toBeVisible()
-    expect(screen.getByText(`${profile.id} (vous)`)).toBeVisible()
-    expect(screen.getByText(sample.id)).toBeVisible()
-    expect(screen.getAllByText('Non renseigné')).toHaveLength(2)
+    expect(screen.getByText('Nom non disponible (vous)')).toBeVisible()
+    expect(screen.queryByText(profile.id)).not.toBeInTheDocument()
+    expect(screen.queryByText(sample.id)).not.toBeInTheDocument()
+    expect(screen.queryByText('Identifiant technique')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Non renseigné')).toHaveLength(1)
     expect(screen.getByText('Dépôt initial')).toBeVisible()
     expect(business.mock.calls[0][1].headers).toBeInstanceOf(Headers)
     expect(
@@ -149,7 +252,10 @@ describe('Gestion des échantillons via le client HTTP authentifié', () => {
     )
     await user.type(screen.getByLabelText('Référence *'), ' K24-017 ')
     await user.type(screen.getByLabelText('Nom *'), ' Silicium ')
-    await user.type(screen.getByLabelText('Description'), 'Dépôt initial')
+    await user.type(
+      screen.getByLabelText('Description (facultatif)'),
+      'Dépôt initial',
+    )
     await user.click(
       screen.getByRole('button', { name: 'Enregistrer l’échantillon' }),
     )
@@ -276,8 +382,8 @@ describe('Gestion des échantillons via le client HTTP authentifié', () => {
       ).toBeVisible()
       expect(
         screen.getAllByText(status === 'ACTIVE' ? 'Actif' : 'Abandonné'),
-      ).toHaveLength(2)
-      expect(screen.getByText('another-owner')).toBeVisible()
+      ).toHaveLength(1)
+      expect(screen.queryByText('another-owner')).not.toBeInTheDocument()
     },
   )
 })

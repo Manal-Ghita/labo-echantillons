@@ -96,6 +96,7 @@ describe('Fabrication HTTP / PostgreSQL réel, savepoints et rollback intégral'
     expect(migrations.map((row) => row.migration_name)).toEqual([
       '20261028000000_init',
       '20261029000000_fabrication_structure',
+      '20261030000000_user_activation',
     ]);
     for (const migration of migrations) {
       expect(migration.finished && migration.not_rolled_back).toBe(true);

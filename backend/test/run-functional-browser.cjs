@@ -144,6 +144,7 @@ async function main() {
     assert.deepEqual(dirs, [
       '20261028000000_init',
       '20261029000000_fabrication_structure',
+      '20261030000000_user_activation',
     ]);
     assert.deepEqual(
       migrations.map((m) => m.migration_name),
@@ -420,7 +421,7 @@ async function main() {
                 page.setDefaultTimeout(10000);
                 await page.goto('http://localhost:5180/login');
                 await page
-                  .getByLabel('Email', { exact: true })
+                  .getByLabel('Adresse e-mail', { exact: true })
                   .fill(actors[name].email);
                 await page
                   .getByLabel('Mot de passe', { exact: true })
@@ -534,20 +535,23 @@ async function main() {
 
               stage = `${viewport.name}: owner sample UI`;
               await adminPage.goto('http://localhost:5180/users');
+              await adminPage
+                .getByRole('button', {
+                  name: 'Ajouter un chercheur',
+                  exact: true,
+                })
+                .click();
               const provisionedPassword = randomBytes(24).toString('base64url');
               secrets.push(provisionedPassword);
               const provisionedEmail = `functional-provisioned-${randomUUID()}@example.test`;
               await adminPage
-                .getByLabel('Nom du chercheur *')
+                .getByLabel('Nom complet *')
                 .fill('Functional provisioned');
               await adminPage
-                .getByLabel('Email du chercheur *')
+                .getByLabel('Adresse e-mail *')
                 .fill(provisionedEmail);
               await adminPage
                 .getByLabel('Mot de passe initial *')
-                .fill(provisionedPassword);
-              await adminPage
-                .getByLabel('Confirmer le mot de passe *')
                 .fill(provisionedPassword);
               const provisionedResponse = adminPage.waitForResponse(
                 (r) =>
@@ -555,7 +559,7 @@ async function main() {
                   r.request().method() === 'POST',
               );
               await adminPage
-                .getByRole('button', { name: 'Créer le compte RESEARCHER' })
+                .getByRole('button', { name: 'Créer le compte' })
                 .click();
               const provisioned = await provisionedResponse;
               assert.equal(provisioned.status(), 201);
@@ -570,7 +574,7 @@ async function main() {
               ids.push(newUser.id);
               await expect(
                 adminPage.getByLabel('Mot de passe initial *'),
-              ).toHaveValue('');
+              ).toHaveCount(0);
               const provisionedPage = await login('provisioned');
               assert.equal((await http(provisionedPage, '/users')).status, 403);
               report(
@@ -586,7 +590,7 @@ async function main() {
                 .getByLabel('Nom *', { exact: true })
                 .fill('Functional flexible film');
               await ownerPage
-                .getByLabel('Description', { exact: true })
+                .getByLabel('Description (facultatif)', { exact: true })
                 .fill('Functional browser fixture');
               const sampleResponsePromise = ownerPage.waitForResponse(
                 (r) =>
@@ -634,15 +638,20 @@ async function main() {
                   .getByLabel('Type d’opération *')
                   .selectOption(type.id);
                 await page.getByLabel('Date de réalisation *').fill(localDate);
-                await page.getByLabel('Résultat *').selectOption(result);
+                await page
+                  .getByRole('radio', {
+                    name: result === 'SUCCESS' ? 'Réussie' : 'Échouée',
+                    exact: true,
+                  })
+                  .check();
                 await page.getByLabel('Température (°C) *').fill(precise);
                 await page.getByLabel('Gaz *', { exact: true }).fill('Argon');
                 await page
                   .getByLabel('Sous vide *')
                   .selectOption(String(boolean));
                 await page
-                  .getByLabel('Opérateur réel (UUID, facultatif)')
-                  .fill(actors.other.id);
+                  .getByLabel('Opérateur réel', { exact: true })
+                  .selectOption(actors.other.id);
                 await page
                   .getByLabel('Observations', { exact: true })
                   .fill(`Functional ${result}`);
@@ -743,11 +752,11 @@ async function main() {
               );
               await expect(
                 ownerPage.locator('.step-history > li').nth(1),
-              ).toContainText('Échouée (FAILURE)');
+              ).toContainText('Échouée');
               await expect(
-                ownerPage.getByText('Historical power = 120 W', {
-                  exact: true,
-                }),
+                ownerPage
+                  .locator('.timeline-summary')
+                  .filter({ hasText: 'Historical power = 120 W' }),
               ).toBeVisible();
               assert.equal(
                 await ownerPage.evaluate(
@@ -996,6 +1005,7 @@ async function main() {
                 .locator('.step-history > li')
                 .filter({ hasText: 'Functional SUCCESS' })
                 .first();
+              await correctedCard.locator('.timeline-toggle').click();
               await correctedCard
                 .getByRole('button', { name: 'Corriger l’étape' })
                 .click();
@@ -1024,10 +1034,10 @@ async function main() {
                 .locator('.step-history > li')
                 .filter({ hasText: 'Validated correction' });
               await expect(
-                revisedCard.getByText('42.125', { exact: true }),
+                revisedCard.getByText('42,125 °C', { exact: true }),
               ).toBeVisible();
               await revisedCard
-                .getByRole('button', { name: 'Afficher les corrections' })
+                .getByRole('button', { name: /Afficher les corrections/ })
                 .click();
               await expect(
                 revisedCard.getByText(
@@ -1135,11 +1145,9 @@ async function main() {
                 201,
               );
               await ownerPage.goto('http://localhost:5180/samples');
+              await ownerPage.getByRole('button', { name: 'Filtres' }).click();
               await ownerPage
-                .getByRole('button', { name: 'Recherche par paramètres' })
-                .click();
-              await ownerPage
-                .getByLabel('Définition du paramètre')
+                .getByLabel('Paramètre', { exact: true })
                 .selectOption(definitions.number);
               await ownerPage.getByLabel('Valeur minimale').fill('42.125');
               await ownerPage.getByLabel('Valeur maximale').fill('42.125');

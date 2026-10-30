@@ -15,6 +15,7 @@ const profile = {
   email: 'camille@example.test',
   role: 'ADMIN',
   createdAt: '2026-10-29T08:00:00Z',
+  isActive: true,
 }
 const definition = {
   id: numberId,
@@ -40,6 +41,7 @@ const original = {
   status: 'ACTIVE',
   description: null,
   createdAt: '2026-10-29T08:00:00Z',
+  isActive: true,
   updatedAt: '2026-10-29T08:00:00Z',
   batchId: null,
   parentId: null,
@@ -154,20 +156,16 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 async function fillAccount() {
   const user = userEvent.setup()
+  await user.click(
+    await screen.findByRole('button', { name: 'Ajouter un chercheur' }),
+  )
   await user.type(
-    await screen.findByLabelText('Nom du chercheur *'),
+    await screen.findByLabelText('Nom complet *'),
     'Nouveau chercheur',
   )
-  await user.type(
-    screen.getByLabelText('Email du chercheur *'),
-    'new@example.test',
-  )
+  await user.type(screen.getByLabelText('Adresse e-mail *'), 'new@example.test')
   await user.type(
     screen.getByLabelText('Mot de passe initial *'),
-    'test-password-42',
-  )
-  await user.type(
-    screen.getByLabelText('Confirmer le mot de passe *'),
     'test-password-42',
   )
   return user
@@ -176,10 +174,8 @@ describe('Comptes RESEARCHER', () => {
   it('crée un chercheur sans champ rôle et efface les mots de passe', async () => {
     open()
     const user = await fillAccount()
-    await user.click(
-      screen.getByRole('button', { name: 'Créer le compte RESEARCHER' }),
-    )
-    expect(await screen.findByText('Compte RESEARCHER créé.')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Créer le compte' }))
+    expect(await screen.findByText('Compte chercheur créé.')).toBeVisible()
     const call = fetcher.mock.calls.find(
       ([, options]) => options.method === 'POST',
     )!
@@ -188,8 +184,13 @@ describe('Comptes RESEARCHER', () => {
       email: 'new@example.test',
       password: 'test-password-42',
     })
+    expect(
+      screen.queryByLabelText('Mot de passe initial *'),
+    ).not.toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: 'Ajouter un chercheur' }),
+    )
     expect(screen.getByLabelText('Mot de passe initial *')).toHaveValue('')
-    expect(screen.getByLabelText('Confirmer le mot de passe *')).toHaveValue('')
   })
   it('interdit la page et le lien à RESEARCHER', async () => {
     actor.role = 'RESEARCHER'
@@ -204,18 +205,19 @@ describe('Comptes RESEARCHER', () => {
       false,
     )
   })
-  it('refuse une confirmation différente', async () => {
+  it('refuse un mot de passe dépassant 72 octets UTF-8', async () => {
     open()
     const user = await fillAccount()
-    await user.clear(screen.getByLabelText('Confirmer le mot de passe *'))
+    await user.clear(screen.getByLabelText('Mot de passe initial *'))
     await user.type(
-      screen.getByLabelText('Confirmer le mot de passe *'),
-      'autre-password',
+      screen.getByLabelText('Mot de passe initial *'),
+      'é'.repeat(37),
     )
-    await user.click(
-      screen.getByRole('button', { name: 'Créer le compte RESEARCHER' }),
-    )
-    expect(await screen.findByRole('alert')).toHaveTextContent('identiques')
+    await user.click(screen.getByRole('button', { name: 'Créer le compte' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Vérifiez')
+    expect(
+      screen.getByLabelText('Mot de passe initial *'),
+    ).toHaveAccessibleDescription(/72 octets UTF-8/)
     expect(
       fetcher.mock.calls.some(([, options]) => options.method === 'POST'),
     ).toBe(false)
@@ -226,11 +228,9 @@ describe('Comptes RESEARCHER', () => {
       mutationError = status
       open()
       const user = await fillAccount()
-      await user.click(
-        screen.getByRole('button', { name: 'Créer le compte RESEARCHER' }),
-      )
+      await user.click(screen.getByRole('button', { name: 'Créer le compte' }))
       expect(await screen.findByRole('alert')).toBeVisible()
-      expect(screen.getByLabelText('Email du chercheur *')).toHaveValue(
+      expect(screen.getByLabelText('Adresse e-mail *')).toHaveValue(
         'new@example.test',
       )
       expect(screen.getByLabelText('Mot de passe initial *')).toHaveValue('')
@@ -238,6 +238,41 @@ describe('Comptes RESEARCHER', () => {
   )
 })
 describe('Recherche et état', () => {
+  it('referme les filtres sans perdre les critères, unités ni combinaison textuelle', async () => {
+    open('/samples?q=Silicium')
+    const user = userEvent.setup()
+    const toggle = await screen.findByRole('button', { name: 'Filtres' })
+    await user.click(toggle)
+    const group = await screen.findByRole('group', {
+      name: 'Paramètre numérique',
+    })
+    await user.selectOptions(screen.getByLabelText('Paramètre'), definition.id)
+    expect(
+      within(group).getByLabelText('Valeur minimale'),
+    ).toHaveAccessibleDescription(/°C/)
+    await user.type(screen.getByLabelText('Valeur minimale'), '10.125')
+    await user.type(screen.getByLabelText('Valeur maximale'), '45')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(group).not.toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Rechercher' }))
+    await waitFor(() =>
+      expect(
+        fetcher.mock.calls.some(([url]) => {
+          const params = new URL(url).searchParams
+          return (
+            params.get('q') === 'Silicium' &&
+            params.get('min') === '10.125' &&
+            params.get('max') === '45' &&
+            params.get('parameterDefinitionId') === definition.id
+          )
+        }),
+      ).toBe(true),
+    )
+    await user.click(toggle)
+    expect(screen.getByLabelText('Valeur minimale')).toHaveValue('10.125')
+    expect(screen.getByLabelText('Valeur maximale')).toHaveValue('45')
+  })
   it('retrouve TEST-WAFER-001 après correction PVD en relançant les mêmes bornes 40–45', async () => {
     actor.role = 'RESEARCHER'
     const definitionId = 'e1492d7d-060d-4750-8a7c-65cba9051930'
@@ -309,18 +344,14 @@ describe('Recherche et état', () => {
         name: 'DEPOT — Dépôt (archivé) / Température (°C)',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByLabelText('Définition du paramètre')).toHaveValue(
-      numberId,
-    )
+    expect(screen.getByLabelText('Paramètre')).toHaveValue(numberId)
   })
   it('conserve la définition de l’URL après le chargement asynchrone du catalogue', async () => {
     open(`/samples?parameterDefinitionId=${numberId}&min=42.125&max=42.125`)
     await screen.findByRole('option', {
       name: 'DEPOT — Dépôt / Température (°C)',
     })
-    expect(screen.getByLabelText('Définition du paramètre')).toHaveValue(
-      numberId,
-    )
+    expect(screen.getByLabelText('Paramètre')).toHaveValue(numberId)
     await userEvent.clear(screen.getByLabelText('Valeur minimale'))
     await userEvent.type(screen.getByLabelText('Valeur minimale'), '42.126')
     await userEvent.clear(screen.getByLabelText('Valeur maximale'))
@@ -340,13 +371,8 @@ describe('Recherche et état', () => {
   it('transmet les bornes précises sous forme de chaînes dans l’URL', async () => {
     open('/samples')
     const user = userEvent.setup()
-    await user.click(
-      await screen.findByRole('button', { name: 'Recherche par paramètres' }),
-    )
-    await user.selectOptions(
-      screen.getByLabelText('Définition du paramètre'),
-      numberId,
-    )
+    await user.click(await screen.findByRole('button', { name: 'Filtres' }))
+    await user.selectOptions(screen.getByLabelText('Paramètre'), numberId)
     await user.type(
       screen.getByLabelText('Valeur minimale'),
       '0.123456789012345678901234567891',
@@ -418,12 +444,20 @@ describe('Recherche et état', () => {
       screen.getByRole('button', { name: 'Confirmer l’abandon' }),
     )
     expect(await screen.findByRole('alert')).toHaveTextContent('Conflit')
-    expect(screen.getAllByText('Actif')).toHaveLength(2)
+    expect(screen.getAllByText('Actif')).toHaveLength(1)
   })
 })
 describe('Corrections visibles', () => {
+  async function expand() {
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: /Afficher les détails de l’étape 1/,
+      }),
+    )
+  }
   it('corrige sans changer l’auteur, actualise et affiche avant/après', async () => {
     open(`/samples/${sampleId}`)
+    await expand()
     const user = userEvent.setup()
     await user.click(
       await screen.findByRole('button', { name: 'Corriger l’étape' }),
@@ -437,7 +471,7 @@ describe('Corrections visibles', () => {
     await user.click(
       screen.getByRole('button', { name: 'Confirmer la correction' }),
     )
-    expect(await screen.findByText('42.125')).toBeVisible()
+    expect(await screen.findByText('42,125 °C')).toBeVisible()
     const call = fetcher.mock.calls.find(
       ([url, options]) =>
         url.endsWith('/corrections') && options.method === 'POST',
@@ -447,7 +481,7 @@ describe('Corrections visibles', () => {
     expect(body.reason).toBe('Erreur de transcription')
     expect(body).not.toHaveProperty('correctedById')
     await user.click(
-      screen.getByRole('button', { name: 'Afficher les corrections' }),
+      screen.getByRole('button', { name: /Afficher les corrections/ }),
     )
     const journal = await screen.findByRole('region', {
       name: 'Journal des corrections',
@@ -459,15 +493,17 @@ describe('Corrections visibles', () => {
       within(journal).getByText('Voir les valeurs avant et après'),
     )
     expect(
-      within(journal).getByText('1.123456789012345678901234567891'),
+      within(journal).getByText('1,123456789012345678901234567891 °C'),
     ).toBeVisible()
-    expect(within(journal).getByText('42.125')).toBeVisible()
+    expect(within(journal).getByText('42,125 °C')).toBeVisible()
   })
   it('autorise la consultation du journal pour un autre chercheur', async () => {
     actor = { ...profile, id: 'other', role: 'RESEARCHER' }
+    step = { ...step, revision: 1 }
     open(`/samples/${sampleId}`)
+    await expand()
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Afficher les corrections' }),
+      await screen.findByRole('button', { name: /Afficher les corrections/ }),
     )
     expect(
       await screen.findByRole('region', { name: 'Journal des corrections' }),
@@ -479,6 +515,7 @@ describe('Corrections visibles', () => {
   it('conserve une saisie en conflit de révision', async () => {
     mutationError = 409
     open(`/samples/${sampleId}`)
+    await expand()
     await userEvent.click(
       await screen.findByRole('button', { name: 'Corriger l’étape' }),
     )

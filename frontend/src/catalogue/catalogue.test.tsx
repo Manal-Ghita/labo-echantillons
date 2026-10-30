@@ -96,6 +96,7 @@ beforeEach(() => {
             name: 'Camille',
             email: 'camille@example.test',
             role,
+            isActive: true,
             createdAt: '2026-10-29T08:00:00Z',
           }),
         )

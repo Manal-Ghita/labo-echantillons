@@ -17,6 +17,13 @@ Champs du corps :
 - `parameterValues` : tableau (éventuellement vide si aucun paramètre obligatoire)
   de couples `{ definitionId, value }`.
 
+Le sélecteur d'opérateur charge une fois `GET /users/operators` à l'ouverture du
+formulaire et recherche les noms côté navigateur. « Moi » désigne l'identifiant
+du profil authentifié ; l'opérateur reste facultatif et peut être une autre
+personne. L'auteur de saisie provient toujours du JWT, et le propriétaire reste
+`creatorId`. Une liste indisponible ou vide est signalée et permet d'enregistrer
+sans opérateur ; aucun identifiant n'est inventé. Le POST conserve `operatorId`.
+
 Les définitions doivent appartenir au type sélectionné, sans doublon.
 Chaque définition obligatoire doit posséder une valeur. La valeur est :
 

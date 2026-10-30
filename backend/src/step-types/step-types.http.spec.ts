@@ -47,8 +47,11 @@ describe('StepTypes HTTP, vrais guards JWT/rôles et Prisma simulé', () => {
     app = module.createNestApplication();
     await app.init();
     jwt = module.get(JwtService);
-    adminToken = await jwt.signAsync({ sub: adminId });
-    researcherToken = await jwt.signAsync({ sub: researcherId });
+    adminToken = await jwt.signAsync({ authVersion: 0, sub: adminId });
+    researcherToken = await jwt.signAsync({
+      authVersion: 0,
+      sub: researcherId,
+    });
   });
   beforeEach(() => {
     jest.resetAllMocks();
@@ -57,9 +60,14 @@ describe('StepTypes HTTP, vrais guards JWT/rôles et Prisma simulé', () => {
       ({ where }: { where: { id: string } }) =>
         Promise.resolve(
           where.id === adminId
-            ? { id: adminId, role: 'ADMIN' }
+            ? { id: adminId, role: 'ADMIN', isActive: true, authVersion: 0 }
             : where.id === researcherId
-              ? { id: researcherId, role: 'RESEARCHER' }
+              ? {
+                  id: researcherId,
+                  role: 'RESEARCHER',
+                  isActive: true,
+                  authVersion: 0,
+                }
               : null,
         ),
     );
@@ -213,6 +221,7 @@ describe('StepTypes HTTP, vrais guards JWT/rôles et Prisma simulé', () => {
   });
   it('ignore un rôle ADMIN revendiqué dans le JWT et vérifie celui en base', async () => {
     const forgedRole = await jwt.signAsync({
+      authVersion: 0,
       sub: researcherId,
       role: 'ADMIN',
     });

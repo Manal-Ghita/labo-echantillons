@@ -40,7 +40,9 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
     app = moduleFixture.createNestApplication();
     configureCors(app, 'http://localhost:5173');
     await app.init();
-    token = await moduleFixture.get(JwtService).signAsync({ sub: userId });
+    token = await moduleFixture
+      .get(JwtService)
+      .signAsync({ sub: userId, authVersion: 0 });
   });
 
   beforeEach(() => {
@@ -50,6 +52,8 @@ describe('API complète (Prisma simulé, aucune écriture réelle)', () => {
     prisma.user.findUnique.mockResolvedValue({
       id: userId,
       role: 'RESEARCHER',
+      isActive: true,
+      authVersion: 0,
     });
     prisma.stepType.findMany.mockResolvedValue([]);
     fabrication = fabricationMock();

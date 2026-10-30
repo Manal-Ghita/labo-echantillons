@@ -50,7 +50,10 @@ export function StatusControl({
     }
   }
   return (
-    <section className="fabrication-section" aria-label="État de l’échantillon">
+    <section
+      className="fabrication-section sample-status-actions"
+      aria-label="État de l’échantillon"
+    >
       {error && (
         <p role="alert" className="alert">
           {error}
@@ -64,7 +67,7 @@ export function StatusControl({
               : 'Abandonner cet échantillon ? Son historique sera conservé et l’ajout d’étapes sera bloqué.'}
           </p>
           <button
-            className="button button-primary"
+            className={`button ${activate ? 'button-primary' : 'button-danger'}`}
             disabled={busy}
             onClick={() => void save()}
           >
@@ -80,7 +83,7 @@ export function StatusControl({
         </>
       ) : (
         <button
-          className="button button-secondary"
+          className={`button ${activate ? 'button-secondary' : 'button-danger'}`}
           onClick={() => setConfirm(true)}
         >
           {activate ? 'Réactiver l’échantillon' : 'Abandonner l’échantillon'}

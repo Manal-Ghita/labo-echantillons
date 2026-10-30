@@ -38,6 +38,7 @@ export async function getProfile(
     typeof result.name !== 'string' ||
     typeof result.email !== 'string' ||
     typeof result.createdAt !== 'string' ||
+    result.isActive !== true ||
     !['ADMIN', 'RESEARCHER'].includes(result.role ?? '')
   ) {
     throw new ApiError(0, 'Le profil renvoyé par le serveur est invalide.')
@@ -48,5 +49,6 @@ export async function getProfile(
     email: result.email,
     role: result.role as UserProfile['role'],
     createdAt: result.createdAt,
+    isActive: result.isActive,
   }
 }
