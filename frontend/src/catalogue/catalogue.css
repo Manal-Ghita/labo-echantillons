@@ -31,3 +31,73 @@
   padding: 1rem;
   border-radius: 5px;
 }
+
+/* Creation only: leave the catalogue and its editing form unchanged. */
+.catalogue-page .catalogue-create-form {
+  width: 100%;
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+.catalogue-create-form > * {
+  min-width: 0;
+  grid-column: 1 / -1;
+  margin-block: 0;
+}
+.catalogue-create-form .field {
+  min-width: 0;
+}
+.catalogue-create-form textarea {
+  resize: vertical;
+}
+.catalogue-create-form > h2 {
+  margin-top: 0.5rem;
+}
+.catalogue-create-form > .parameter-fields {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 0.875rem 1.25rem;
+  padding: 1rem;
+}
+.catalogue-create-form .parameter-fields .field > p {
+  margin-block: 0.25rem 0;
+}
+.catalogue-create-form .parameter-fields .catalogue-checkbox {
+  margin-bottom: 0;
+  align-self: center;
+}
+.catalogue-create-form .parameter-fields > .button {
+  justify-self: start;
+}
+.catalogue-create-form > .button {
+  justify-self: start;
+}
+.catalogue-create-form > .form-actions {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+.catalogue-create-form > .form-actions > .button {
+  flex: 0 1 auto;
+}
+@media (min-width: 900px) {
+  .catalogue-page .catalogue-create-form,
+  .catalogue-create-form > .parameter-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .catalogue-create-form > .field:has(#catalogue-code) {
+    grid-column: 1;
+  }
+  .catalogue-create-form > .field:has(#catalogue-name) {
+    grid-column: 2;
+  }
+  .catalogue-create-form .parameter-fields > .button {
+    justify-self: end;
+  }
+}

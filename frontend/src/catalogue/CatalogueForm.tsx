@@ -97,7 +97,7 @@ export function CatalogueForm({
 
   return (
     <form
-      className="sample-panel sample-form"
+      className={`sample-panel sample-form${initial ? '' : ' catalogue-create-form'}`}
       aria-label={
         initial ? 'Modifier le type d’opération' : 'Créer un type d’opération'
       }

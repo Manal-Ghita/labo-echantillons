@@ -32,6 +32,58 @@ const seed: StepType = {
   ],
 }
 
+for (const width of [1440, 1024, 768, 390]) {
+  test(`création du catalogue pleine largeur à ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.route('http://localhost:3000/**', async (route) => {
+      if (route.request().method() === 'OPTIONS')
+        return route.fulfill({ status: 204, headers: cors })
+      expect(route.request().method()).toBe('GET')
+      expect(new URL(route.request().url()).pathname).toBe('/auth/me')
+      return route.fulfill({ headers: cors, json: profile })
+    })
+    await page.addInitScript(() => sessionStorage.setItem('labo.session', JSON.stringify({
+      token: 'catalogue-layout-token', expiresAt: Date.now() + 3600000,
+    })))
+    await page.goto('/step-types/new')
+    const form = page.getByRole('form', { name: 'Créer un type d’opération' })
+    await expect(form).toBeVisible()
+    const section = await page.locator('.catalogue-page').boundingBox()
+    const box = await form.boundingBox()
+    expect(Math.abs(box!.width - section!.width)).toBeLessThan(2)
+    const code = await page.getByLabel('Code *').boundingBox()
+    const name = await page.getByLabel('Nom *', { exact: true }).boundingBox()
+    if (width >= 900) {
+      expect(Math.abs(code!.y - name!.y)).toBeLessThan(2)
+      expect(Math.abs(code!.width - name!.width)).toBeLessThan(2)
+      expect(name!.x).toBeGreaterThan(code!.x + code!.width)
+    } else expect(name!.y).toBeGreaterThan(code!.y + code!.height)
+    const description = await page.getByLabel('Description', { exact: true }).boundingBox()
+    expect(description!.width).toBeGreaterThanOrEqual(code!.width)
+    for (let i = 0; i < 4; i++) {
+      await page.getByRole('button', { name: 'Ajouter un paramètre' }).click()
+      const group = page.getByRole('group').last()
+      await group.getByLabel('Clé *').fill(`parameter_${i}`)
+      await group.getByLabel('Nom du paramètre *').fill(`Paramètre ${i + 1}`)
+      await group.getByLabel('Unité', { exact: true }).fill('nm')
+      const input = await group.getByLabel('Clé *').boundingBox()
+      expect(input!.width).toBeGreaterThan(180)
+    }
+    await expect(page.getByRole('group')).toHaveCount(4)
+    await page.getByRole('button', { name: 'Retirer le paramètre 2', exact: true }).click()
+    await expect(page.getByRole('group')).toHaveCount(3)
+    await expect(page.getByLabel('Clé *').nth(1)).toHaveValue('parameter_2')
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width)
+    const cancel = await page.getByRole('button', { name: 'Annuler', exact: true }).boundingBox()
+    const create = await page.getByRole('button', { name: 'Créer le type', exact: true }).boundingBox()
+    if (width >= 900) {
+      expect(create!.x).toBeGreaterThan(cancel!.x)
+      expect(Math.abs(create!.y - cancel!.y)).toBeLessThan(2)
+    }
+    await page.screenshot({ path: testInfo.outputPath(`catalogue-create-${width}.png`), fullPage: true })
+  })
+}
+
 test('ADMIN crée les définitions, désactive et réactive sans perdre les paramètres', async ({
   page,
 }, testInfo) => {
