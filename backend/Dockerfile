@@ -33,3 +33,12 @@ COPY docker/start.cjs ./docker/start.cjs
 USER node
 EXPOSE 3000
 CMD ["node", "docker/start.cjs", "serve"]
+
+# Separate entrypoints: V1 targets and startup remain unchanged.
+FROM migration AS migration-v2
+COPY docker/start-v2.cjs ./docker/start-v2.cjs
+CMD ["node", "docker/start-v2.cjs", "migrate"]
+
+FROM runtime AS runtime-v2
+COPY docker/start-v2.cjs ./docker/start-v2.cjs
+CMD ["node", "docker/start-v2.cjs", "serve"]
