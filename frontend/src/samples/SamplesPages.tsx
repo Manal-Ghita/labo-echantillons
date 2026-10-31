@@ -16,6 +16,7 @@ import { StatusControl } from './StatusControl'
 import { SampleLineage } from './SampleLineage'
 import { AdvancedSearch } from './AdvancedSearch'
 import { Attachments } from '../attachments/Attachments'
+import { MeasurementImports } from '../imports/MeasurementImports'
 import { advancedKeys, advancedQueryError } from './advanced-query'
 import type { Sample } from './api'
 import './entry-forms.css'
@@ -382,6 +383,7 @@ export function SampleDetailPage() {
             sampleId={sample.id}
             authorized={user?.role === 'ADMIN' || user?.id === sample.creatorId}
           />
+          <MeasurementImports sampleId={sample.id} authorized={user?.role === 'ADMIN' || user?.id === sample.creatorId} />
           <SampleLineage
             key={`lineage:${sample.id}`}
             sample={sample}

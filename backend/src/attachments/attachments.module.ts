@@ -9,5 +9,6 @@ import { FileStorage } from './file-storage.service';
   imports: [AuthModule, PrismaModule],
   controllers: [AttachmentsController],
   providers: [AttachmentsService, FileStorage],
+  exports: [FileStorage],
 })
 export class AttachmentsModule {}

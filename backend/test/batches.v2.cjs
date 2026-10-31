@@ -53,7 +53,7 @@ async function main() {
     assert.deepEqual(identity, { db: 'labo_echantillons_v2', usr: 'labo_v2' });
     const migrations =
       await prisma.$queryRaw`SELECT migration_name, checksum, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY migration_name`;
-    assert.equal(migrations.length, 4);
+    assert.equal(migrations.length, 5);
     for (const m of migrations) {
       assert.ok(m.finished_at && !m.rolled_back_at);
       assert.equal(
@@ -72,7 +72,7 @@ async function main() {
           .digest('hex'),
       );
     }
-    pass('exact V2 identity and four migration checksums');
+    pass('exact V2 identity and five migration checksums');
     const before = await fingerprints();
     let runError;
     try {
@@ -158,6 +158,8 @@ async function main() {
               'stepParameterValue',
               'stepCorrection',
               'attachment',
+              'measurementImport',
+              'importedMeasurementValue',
             ].map((name) => [name, tx[name]]),
           );
           facade.$transaction = async (work) => {

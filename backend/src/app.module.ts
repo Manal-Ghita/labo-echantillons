@@ -7,6 +7,7 @@ import { FabricationStepsModule } from './fabrication-steps/fabrication-steps.mo
 import { UsersModule } from './users/users.module';
 import { BatchesModule } from './batches/batches.module';
 import { AttachmentsModule } from './attachments/attachments.module';
+import { MeasurementImportsModule } from './measurement-imports/measurement-imports.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AttachmentsModule } from './attachments/attachments.module';
     UsersModule,
     BatchesModule,
     AttachmentsModule,
+    MeasurementImportsModule,
   ],
 })
 export class AppModule {}

@@ -35,7 +35,7 @@ async function runV2HttpTest(label, scenario) {
       await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
       const tables =
         await tx.$queryRaw`SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename`;
-      assert.equal(tables.length, 10);
+      assert.equal(tables.length, 12);
       const result = {};
       for (const { tablename } of tables) {
         assert.match(tablename, /^[A-Za-z_]+$/);
@@ -65,6 +65,7 @@ async function runV2HttpTest(label, scenario) {
         '20261029000000_fabrication_structure',
         '20261030000000_user_activation',
         '20261103000000_attachments',
+        '20261104000000_measurement_imports',
       ],
     );
     for (const m of migrations) {
@@ -86,7 +87,7 @@ async function runV2HttpTest(label, scenario) {
       );
     }
     pass(
-      'exact V2 identity and four migration checksums verified before writes',
+      'exact V2 identity and five migration checksums verified before writes',
     );
     const before = await fingerprints();
     const rollback = new Error('EXPECTED_V2_OUTER_ROLLBACK');
@@ -121,6 +122,8 @@ async function runV2HttpTest(label, scenario) {
               'stepParameterValue',
               'stepCorrection',
               'attachment',
+              'measurementImport',
+              'importedMeasurementValue',
             ].map((name) => [name, tx[name]]),
           );
           facade.$queryRaw = tx.$queryRaw.bind(tx);
@@ -174,7 +177,7 @@ async function runV2HttpTest(label, scenario) {
     }
     assert.deepEqual(await fingerprints(), before);
     pass(
-      'outer rollback verified: ten fingerprints unchanged and synthetic fixtures removed',
+      'outer rollback verified: twelve fingerprints unchanged and synthetic fixtures removed',
     );
     if (failure) throw failure;
     console.log(`${checks} ${label} V2 checks passed.`);

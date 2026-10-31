@@ -49,6 +49,7 @@ model User {
   createdBatches  Batch[]
   stepCorrections StepCorrection[]
   attachments     Attachment[]
+  measurementImports MeasurementImport[]
 }
 
 model Sample {
@@ -70,6 +71,7 @@ model Sample {
   originStep   FabricationStep?  @relation("SampleOrigin", fields: [originStepId], references: [id], onDelete: Restrict)
   status       SampleStatus?
   attachments  Attachment[]
+  measurementImports MeasurementImport[]
 
   @@index([creatorId])
   @@index([batchId])
@@ -99,6 +101,7 @@ model FabricationStep {
   corrections     StepCorrection[]
   derivedSamples  Sample[]             @relation("SampleOrigin")
   attachments     Attachment[]
+  measurementImports MeasurementImport[]
 
   @@index([sampleId, performedAt])
   @@index([recordedById])
@@ -126,6 +129,7 @@ model StepType {
   createdAt   DateTime              @default(now()) @db.Timestamptz(3)
   parameters  ParameterDefinition[]
   steps       FabricationStep[]
+  measurementImports MeasurementImport[]
 }
 
 model ParameterDefinition {
@@ -138,6 +142,7 @@ model ParameterDefinition {
   unit       String?
   isRequired Boolean
   values     StepParameterValue[]
+  importedValues ImportedMeasurementValue[]
 
   @@unique([stepTypeId, key])
 }
@@ -186,8 +191,51 @@ model Attachment {
   sample       Sample           @relation(fields: [sampleId], references: [id], onDelete: Restrict)
   stepId       String?          @db.Uuid
   step         FabricationStep? @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  measurementImports MeasurementImport[]
 
   @@index([sampleId, stepId, createdAt])
   @@index([stepId])
   @@index([createdById])
+}
+
+model MeasurementImport {
+  id               String @id @default(uuid()) @db.Uuid
+  sampleId         String @db.Uuid
+  sample           Sample @relation(fields: [sampleId], references: [id], onDelete: Restrict)
+  stepId           String? @db.Uuid
+  step             FabricationStep? @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  stepTypeId       String @db.Uuid
+  stepType         StepType @relation(fields: [stepTypeId], references: [id], onDelete: Restrict)
+  sourceAttachmentId String @db.Uuid
+  sourceAttachment Attachment @relation(fields: [sourceAttachmentId], references: [id], onDelete: Restrict)
+  sourceSha256     String @db.Char(64)
+  deduplicationKey String @unique @db.Char(64)
+  format           String @default("CSV") @db.VarChar(20)
+  settings         Json
+  rowCount         Int
+  createdById      String @db.Uuid
+  createdBy        User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+  values           ImportedMeasurementValue[]
+
+  @@index([sampleId, stepId, createdAt])
+  @@index([sourceAttachmentId])
+  @@index([stepTypeId])
+  @@index([createdById])
+}
+
+model ImportedMeasurementValue {
+  id           String @id @default(uuid()) @db.Uuid
+  importId     String @db.Uuid
+  import       MeasurementImport @relation(fields: [importId], references: [id], onDelete: Restrict)
+  rowNumber    Int
+  sourceLine   Int
+  definitionId String @db.Uuid
+  definition   ParameterDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+  numericValue Decimal? @db.Decimal(65,30)
+  textValue    String?
+  booleanValue Boolean?
+
+  @@unique([importId, rowNumber, definitionId])
+  @@index([definitionId, numericValue])
 }

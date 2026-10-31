@@ -1,0 +1,63 @@
+.measurement-imports {
+  margin-block: 1rem;
+}
+.measurement-imports > button {
+  margin: 0 0.5rem 0.5rem 0;
+}
+.import-list article {
+  border-bottom: 1px solid var(--color-border, #d9e3ea);
+  padding-block: 0.75rem;
+}
+.csv-wizard fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.csv-wizard .field {
+  margin-block: 0.8rem;
+}
+.import-options,
+.import-mapping {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+.import-table-scroll {
+  max-width: 100%;
+  max-height: 24rem;
+  overflow: auto;
+  margin-block: 0.75rem;
+}
+.import-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.import-table-scroll th,
+.import-table-scroll td {
+  padding: 0.5rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #d9e3ea);
+  overflow-wrap: anywhere;
+  min-width: 6rem;
+}
+.import-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-block: 1rem;
+}
+.import-confirm input {
+  width: auto;
+  flex-shrink: 0;
+}
+.csv-wizard input[type='file'] {
+  max-width: 100%;
+  height: auto;
+}
+@media (max-width: 600px) {
+  .import-options,
+  .import-mapping {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}

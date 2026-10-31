@@ -98,9 +98,9 @@ si l’administrateur change la configuration.
 - `node test/attachments.v2.cjs` : vrais appels HTTP NestJS, JWT, Prisma, PostgreSQL
   et fichiers temporaires privés. Cible exacte requise via `V2_TEST_DATABASE_URL` :
   `127.0.0.1:5433`, utilisateur `labo_v2`, base `labo_echantillons_v2`.
-- Le test vérifie les quatre migrations et leurs checksums avant toute écriture.
+- Le test vérifie les migrations versionnées et leurs checksums avant toute écriture.
   Les fixtures restent dans une transaction englobante, avec savepoints par requête,
-  rollback final et comparaison des dix empreintes. Le répertoire temporaire créé
+  rollback final et comparaison de toutes les empreintes. Le répertoire temporaire créé
   par le test est nettoyé dans `finally`, sans toucher au volume applicatif.
 - `test/migrate-v2-attachments.cjs` vérifie la cible et la liste fermée des migrations
   avant `migrate deploy`, puis compare les huit tables préexistantes. Ce script est
