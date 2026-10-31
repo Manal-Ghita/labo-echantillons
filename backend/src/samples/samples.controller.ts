@@ -43,6 +43,11 @@ export class SamplesController {
     return this.samples.numericParameters();
   }
 
+  @Get('search-operation-types')
+  searchOperationTypes() {
+    return this.samples.searchOperationTypes();
+  }
+
   @Get(':id')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.samples.findOne(id);

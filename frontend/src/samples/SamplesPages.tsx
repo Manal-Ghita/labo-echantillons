@@ -14,6 +14,8 @@ import { SampleSteps } from '../fabrication/SampleSteps'
 import { NumericSearch } from './NumericSearch'
 import { StatusControl } from './StatusControl'
 import { SampleLineage } from './SampleLineage'
+import { AdvancedSearch } from './AdvancedSearch'
+import { advancedKeys, advancedQueryError } from './advanced-query'
 import type { Sample } from './api'
 import './entry-forms.css'
 
@@ -43,16 +45,69 @@ export function SamplesPage() {
   const definitionId = search.get('parameterDefinitionId') || ''
   const min = search.get('min') || ''
   const max = search.get('max') || ''
-  const [advanced, setAdvanced] = useState(!!(definitionId || min || max))
+  const status = search.get('status') || ''
+  const batchId = search.get('batchId') || ''
+  const stepTypeId = search.get('stepTypeId') || ''
+  const matchMode = search.get('matchMode') || ''
+  const numericFilters = search.get('numericFilters') || ''
+  const extra = { status, batchId, stepTypeId, matchMode, numericFilters }
+  const hasFilters = !!(
+    definitionId ||
+    min ||
+    max ||
+    Object.values(extra).some(Boolean)
+  )
+  const [advanced, setAdvanced] = useState(hasFilters)
   const [filtersMounted, setFiltersMounted] = useState(advanced)
+  const [formError, setFormError] = useState('')
+  const searchError = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (formError) {
+      searchError.current?.focus()
+      searchError.current?.scrollIntoView?.({ block: 'nearest' })
+    }
+  }, [formError])
+  const queryKey = JSON.stringify([
+    q,
+    definitionId,
+    min,
+    max,
+    status,
+    batchId,
+    stepTypeId,
+    matchMode,
+    numericFilters,
+  ])
+  const [legacyDraft, setLegacyDraft] = useState({
+    source: queryKey,
+    selected: !!definitionId,
+  })
+  const legacyDraftSelected =
+    legacyDraft.source === queryKey ? legacyDraft.selected : !!definitionId
   const load = useCallback(
     (signal: AbortSignal) =>
       listSamples(api, q, signal, {
         parameterDefinitionId: definitionId,
         min,
         max,
+        status,
+        batchId,
+        stepTypeId,
+        matchMode,
+        numericFilters,
       }),
-    [api, q, definitionId, min, max],
+    [
+      api,
+      q,
+      definitionId,
+      min,
+      max,
+      status,
+      batchId,
+      stepTypeId,
+      matchMode,
+      numericFilters,
+    ],
   )
   const result = useSampleQuery(load)
   return (
@@ -70,9 +125,18 @@ export function SamplesPage() {
         </Link>
       </div>
       <form
-        key={`${q}:${definitionId}:${min}:${max}`}
+        key={queryKey}
         className="sample-search"
         role="search"
+        onChangeCapture={(event) => {
+          setFormError('')
+          setLegacyDraft({
+            source: queryKey,
+            selected: !!new FormData(event.currentTarget).get(
+              'parameterDefinitionId',
+            ),
+          })
+        }}
         onSubmit={(event) => {
           event.preventDefault()
           const value = String(
@@ -80,16 +144,30 @@ export function SamplesPage() {
           ).trim()
           const params = new URLSearchParams(value ? { q: value } : {})
           const form = new FormData(event.currentTarget)
-          for (const key of ['parameterDefinitionId', 'min', 'max']) {
+          for (const key of [
+            'parameterDefinitionId',
+            'min',
+            'max',
+            ...advancedKeys.filter((key) => key !== 'matchMode'),
+          ]) {
             const field = String(form.get(key) || '').trim()
             if (field) params.set(key, field)
           }
+          if (
+            (params.has('parameterDefinitionId') ||
+              params.has('numericFilters') ||
+              params.has('stepTypeId')) &&
+            form.get('matchMode')
+          )
+            params.set('matchMode', String(form.get('matchMode')))
+          const invalid = advancedQueryError(params)
+          setFormError(invalid)
+          if (invalid) return
           // A new submission must refresh data even if the URL filters did not change.
           if (
-            (params.get('q') ?? '') === q &&
-            (params.get('parameterDefinitionId') ?? '') === definitionId &&
-            (params.get('min') ?? '') === min &&
-            (params.get('max') ?? '') === max
+            ['q', 'parameterDefinitionId', 'min', 'max', ...advancedKeys].every(
+              (key) => (params.get(key) ?? '') === (search.get(key) ?? ''),
+            )
           )
             result.retry()
           setSearch(params)
@@ -114,14 +192,14 @@ export function SamplesPage() {
               setAdvanced((current) => !current)
             }}
             aria-expanded={advanced}
-            aria-controls="numeric-filters"
+            aria-controls="sample-filters"
           >
             Filtres
           </button>
           <button className="button button-primary" type="submit">
             Rechercher
           </button>
-          {(q || definitionId || min || max) && (
+          {(q || hasFilters) && (
             <button
               className="button button-secondary"
               type="button"
@@ -131,13 +209,29 @@ export function SamplesPage() {
             </button>
           )}
         </div>
-        {(filtersMounted || definitionId || min || max) && (
-          <NumericSearch
-            definitionId={definitionId}
-            min={min}
-            max={max}
+        {formError && (
+          <p ref={searchError} tabIndex={-1} role="alert" className="alert">
+            {formError}
+          </p>
+        )}
+        {(filtersMounted || hasFilters) && (
+          <div
+            className="search-filter-panel"
+            id="sample-filters"
             hidden={!advanced}
-          />
+          >
+            <NumericSearch
+              definitionId={definitionId}
+              min={min}
+              max={max}
+              hidden={!advanced}
+            />
+            <AdvancedSearch
+              initial={extra}
+              legacySelected={legacyDraftSelected}
+              onEdit={() => setFormError('')}
+            />
+          </div>
         )}
       </form>
       {result.loading && <p role="status">Chargement des échantillons…</p>}
@@ -154,12 +248,14 @@ export function SamplesPage() {
           {result.data.length === 0 ? (
             <div className="placeholder-card">
               <h2>
-                {q || definitionId ? 'Aucun résultat' : 'Aucun échantillon'}
+                {q || hasFilters ? 'Aucun résultat' : 'Aucun échantillon'}
               </h2>
               <p>
                 {q
                   ? 'Essayez une autre référence ou un autre nom.'
-                  : 'Créez un premier échantillon pour commencer.'}
+                  : hasFilters
+                    ? 'Ajustez les critères ou effacez les filtres pour élargir la recherche.'
+                    : 'Créez un premier échantillon pour commencer.'}
               </p>
             </div>
           ) : (

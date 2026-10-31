@@ -15,6 +15,7 @@ import { decimalValue } from '../fabrication-steps/decimal-value';
 import type { AuthenticatedUser } from '../auth/jwt-auth.guard';
 import type { SampleStatus } from '../generated/prisma/client';
 import { SplitSampleDto } from './dto/split-sample.dto';
+import { advancedSampleWhere } from './advanced-search';
 
 @Injectable()
 export class SamplesService {
@@ -66,6 +67,18 @@ export class SamplesService {
 
   async findAll(query?: string, filter: ListSamplesDto = {}) {
     const q = query?.trim();
+    if (
+      filter.status !== undefined ||
+      filter.batchId !== undefined ||
+      filter.stepTypeId !== undefined ||
+      filter.matchMode !== undefined ||
+      filter.numericFilters !== undefined
+    ) {
+      return this.prisma.sample.findMany({
+        where: await advancedSampleWhere(this.prisma, q, filter),
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      });
+    }
     const where: Prisma.SampleWhereInput = q
       ? {
           OR: [
@@ -266,6 +279,14 @@ export class SamplesService {
         },
       },
       orderBy: [{ stepType: { code: 'asc' } }, { key: 'asc' }],
+    });
+  }
+
+  searchOperationTypes() {
+    return this.prisma.stepType.findMany({
+      where: { OR: [{ isActive: true }, { steps: { some: {} } }] },
+      select: { id: true, code: true, name: true, isActive: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
   }
 }
