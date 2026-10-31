@@ -53,7 +53,7 @@ async function main() {
     assert.deepEqual(identity, { db: 'labo_echantillons_v2', usr: 'labo_v2' });
     const migrations =
       await prisma.$queryRaw`SELECT migration_name, checksum, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY migration_name`;
-    assert.equal(migrations.length, 3);
+    assert.equal(migrations.length, 4);
     for (const m of migrations) {
       assert.ok(m.finished_at && !m.rolled_back_at);
       assert.equal(
@@ -72,7 +72,7 @@ async function main() {
           .digest('hex'),
       );
     }
-    pass('exact V2 identity and three unchanged migration checksums');
+    pass('exact V2 identity and four migration checksums');
     const before = await fingerprints();
     let runError;
     try {
@@ -157,6 +157,7 @@ async function main() {
               'fabricationStep',
               'stepParameterValue',
               'stepCorrection',
+              'attachment',
             ].map((name) => [name, tx[name]]),
           );
           facade.$transaction = async (work) => {
@@ -416,7 +417,7 @@ async function main() {
     }
     assert.deepEqual(await fingerprints(), before);
     pass(
-      'all nine V2 fingerprints unchanged after outer rollback; no synthetic account or fixture retained',
+      'all V2 fingerprints unchanged after outer rollback; no synthetic account or fixture retained',
     );
     if (runError) throw runError;
     console.log(`${checks} V2 integration checks passed.`);

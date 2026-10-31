@@ -14,6 +14,7 @@ export class ApiError extends Error {
 type RequestOptions = Omit<RequestInit, 'body' | 'credentials'> & {
   body?: unknown
   authenticated?: boolean
+  responseType?: 'json' | 'blob'
 }
 type ClientOptions = {
   baseUrl?: string
@@ -50,6 +51,7 @@ export function createApiClient(options: ClientOptions) {
       const {
         body,
         authenticated = true,
+        responseType = 'json',
         headers: customHeaders,
         ...init
       } = optionsForRequest
@@ -59,16 +61,29 @@ export function createApiClient(options: ClientOptions) {
       const headers = new Headers(customHeaders)
       headers.delete('Authorization')
       if (token) headers.set('Authorization', `Bearer ${token}`)
-      if (body !== undefined) headers.set('Content-Type', 'application/json')
+      const multipart = body instanceof FormData
+      if (multipart) headers.delete('Content-Type')
+      else if (body !== undefined)
+        headers.set('Content-Type', 'application/json')
       try {
         const response = await fetch(`${baseUrl}${path}`, {
           ...init,
           headers,
-          body: body === undefined ? undefined : JSON.stringify(body),
+          body: multipart
+            ? body
+            : body === undefined
+              ? undefined
+              : JSON.stringify(body),
           credentials: 'omit',
           cache: 'no-store',
           redirect: 'error',
         })
+        if (response.ok && responseType === 'blob') {
+          const blob = await response.blob()
+          if (init.signal?.aborted)
+            throw new DOMException('Requête annulée.', 'AbortError')
+          return blob as T
+        }
         const text = await response.text()
         if (init.signal?.aborted)
           throw new DOMException('Requête annulée.', 'AbortError')
@@ -98,6 +113,11 @@ export function createApiClient(options: ClientOptions) {
               'Vous n’avez pas les droits nécessaires pour cette action.'
           else if (response.status === 400)
             userMessage = 'Veuillez vérifier les champs du formulaire.'
+          else if (response.status === 413)
+            userMessage = 'Le fichier dépasse la taille maximale autorisée.'
+          else if (response.status === 415)
+            userMessage =
+              'Format de fichier refusé. Utilisez un fichier JPEG, PNG, PDF ou CSV UTF-8 valide.'
           else if (response.status >= 500)
             userMessage = 'Le service est momentanément indisponible.'
           else if (typeof message === 'string') userMessage = message

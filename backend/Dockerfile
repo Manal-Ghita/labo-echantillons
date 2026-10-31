@@ -40,5 +40,8 @@ COPY docker/start-v2.cjs ./docker/start-v2.cjs
 CMD ["node", "docker/start-v2.cjs", "migrate"]
 
 FROM runtime AS runtime-v2
+USER root
+RUN mkdir -p /app/storage/attachments && chown -R node:node /app/storage
+USER node
 COPY docker/start-v2.cjs ./docker/start-v2.cjs
 CMD ["node", "docker/start-v2.cjs", "serve"]

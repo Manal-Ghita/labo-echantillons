@@ -1,0 +1,41 @@
+.attachments {
+  margin-block: 1rem;
+}
+.attachments-content {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border, #d9e3ea);
+  border-radius: 0.5rem;
+  min-width: 0;
+}
+.attachment-list {
+  list-style: none;
+  padding: 0;
+}
+.attachment-list li {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--color-border, #d9e3ea);
+}
+.attachment-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.attachment-list small {
+  display: block;
+  margin-top: 0.25rem;
+}
+.attachments input[type='file'] {
+  width: 100%;
+  min-width: 0;
+  height: auto;
+}
+@media (max-width: 600px) {
+  .attachment-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

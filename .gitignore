@@ -36,3 +36,7 @@ report.*.json
 playwright-report/
 test-results/
 dist-ssr/
+
+# Private local attachment bytes; production storage lives in a Docker volume.
+/backend/storage/
+/storage/

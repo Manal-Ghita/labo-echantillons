@@ -40,6 +40,10 @@ services:
       JWT_SECRET: ${V2_JWT_SECRET:?Configurer .env.v2}
       WEB_ORIGIN: http://localhost:8180
       PORT: "3000"
+      ATTACHMENT_STORAGE_DIR: /app/storage/attachments
+      ATTACHMENT_MAX_BYTES: ${V2_ATTACHMENT_MAX_BYTES:-10485760}
+    volumes:
+      - attachments_v2:/app/storage/attachments
     ports:
       - "127.0.0.1:3100:3000"
     depends_on:
@@ -74,3 +78,5 @@ services:
 volumes:
   postgres_v2:
     name: labo-echantillons-v2_postgres_data
+  attachments_v2:
+    name: labo-echantillons-v2_attachments_data

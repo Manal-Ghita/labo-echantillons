@@ -15,6 +15,7 @@ import { NumericSearch } from './NumericSearch'
 import { StatusControl } from './StatusControl'
 import { SampleLineage } from './SampleLineage'
 import { AdvancedSearch } from './AdvancedSearch'
+import { Attachments } from '../attachments/Attachments'
 import { advancedKeys, advancedQueryError } from './advanced-query'
 import type { Sample } from './api'
 import './entry-forms.css'
@@ -377,6 +378,10 @@ export function SampleDetailPage() {
               </div>
             </dl>
           </div>
+          <Attachments
+            sampleId={sample.id}
+            authorized={user?.role === 'ADMIN' || user?.id === sample.creatorId}
+          />
           <SampleLineage
             key={`lineage:${sample.id}`}
             sample={sample}

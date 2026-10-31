@@ -20,7 +20,7 @@ async function verify() {
     const identity = (await client.query('SELECT current_database() db, current_user usr')).rows[0];
     assert.deepEqual(identity, { db: 'labo_echantillons_v2', usr: 'labo_v2' });
     const migrations = (await client.query('SELECT migration_name, checksum, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY migration_name')).rows;
-    const names = ['20261028000000_init', '20261029000000_fabrication_structure', '20261030000000_user_activation'];
+    const names = ['20261028000000_init', '20261029000000_fabrication_structure', '20261030000000_user_activation', '20261103000000_attachments'];
     assert.deepEqual(migrations.map(m => m.migration_name), names);
     for (const m of migrations) {
       assert.ok(m.finished_at && !m.rolled_back_at);
@@ -29,7 +29,7 @@ async function verify() {
     }
     async function fingerprints() {
       const tables = (await client.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")).rows;
-      assert.equal(tables.length, 9);
+      assert.equal(tables.length, 10);
       const result = {};
       for (const { tablename } of tables) {
         assert.match(tablename, /^[A-Za-z_]+$/);
@@ -47,7 +47,7 @@ async function verify() {
     await client.query('ROLLBACK'); inTransaction = false;
     assert.equal((await client.query('SELECT count(*)::int count FROM "User" WHERE id=$1', [id])).rows[0].count, 0);
     assert.deepEqual(await fingerprints(), before);
-    console.log('PASS V2 exact identity; three migration checksums; synthetic write/defaults/rollback; nine fingerprints unchanged.');
+    console.log('PASS V2 exact identity; four migration checksums; synthetic write/defaults/rollback; ten fingerprints unchanged.');
   } finally {
     if (inTransaction) await client.query('ROLLBACK');
     await client.end();

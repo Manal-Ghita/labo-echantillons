@@ -3,6 +3,7 @@ import type { FabricationStep } from './api'
 import { formatDate } from '../samples/api'
 import { numericDisplay, resultDisplay } from './display'
 import { StepCorrections } from './StepCorrections'
+import { Attachments } from '../attachments/Attachments'
 
 function parameterText(value: FabricationStep['parameterValues'][number]) {
   if (value.definition.dataType === 'NUMBER')
@@ -131,6 +132,11 @@ export function TimelineStep({
               {formatDate(step.recordedAt)}
             </time>
           </p>
+          <Attachments
+            sampleId={sampleId}
+            stepId={step.id}
+            authorized={authorized}
+          />
           <StepCorrections
             key={step.revision ?? 0}
             step={step}

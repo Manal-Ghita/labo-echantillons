@@ -48,6 +48,7 @@ model User {
   operatedSteps   FabricationStep[] @relation("StepOperator")
   createdBatches  Batch[]
   stepCorrections StepCorrection[]
+  attachments     Attachment[]
 }
 
 model Sample {
@@ -68,6 +69,7 @@ model Sample {
   originStepId String?           @db.Uuid
   originStep   FabricationStep?  @relation("SampleOrigin", fields: [originStepId], references: [id], onDelete: Restrict)
   status       SampleStatus?
+  attachments  Attachment[]
 
   @@index([creatorId])
   @@index([batchId])
@@ -96,6 +98,7 @@ model FabricationStep {
   parameterValues StepParameterValue[]
   corrections     StepCorrection[]
   derivedSamples  Sample[]             @relation("SampleOrigin")
+  attachments     Attachment[]
 
   @@index([sampleId, performedAt])
   @@index([recordedById])
@@ -167,4 +170,24 @@ model StepCorrection {
 
   @@unique([stepId, revision])
   @@index([correctedById, correctedAt])
+}
+
+model Attachment {
+  id           String           @id @default(uuid()) @db.Uuid
+  storageKey   String           @unique @db.Uuid
+  originalName String           @db.VarChar(255)
+  mimeType     String           @db.VarChar(100)
+  size         Int
+  sha256       String           @db.Char(64)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  createdById  String           @db.Uuid
+  createdBy    User             @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  sampleId     String           @db.Uuid
+  sample       Sample           @relation(fields: [sampleId], references: [id], onDelete: Restrict)
+  stepId       String?          @db.Uuid
+  step         FabricationStep? @relation(fields: [stepId], references: [id], onDelete: Restrict)
+
+  @@index([sampleId, stepId, createdAt])
+  @@index([stepId])
+  @@index([createdById])
 }
